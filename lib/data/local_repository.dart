@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart' as sq;
 
 import '../domain/models.dart';
+import 'android_widget.dart';
 
 enum ImportMode { merge, replace }
 
@@ -89,6 +90,7 @@ class LocalRepository {
         'snapshot': jsonEncode(validated.toJson()),
       }, conflictAlgorithm: sq.ConflictAlgorithm.replace);
     });
+    await AndroidWidget.refresh();
   }
 
   Future<File> exportBackup() async {

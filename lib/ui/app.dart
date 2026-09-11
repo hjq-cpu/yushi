@@ -12,6 +12,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../app_controller.dart';
 import '../data/local_repository.dart';
+import '../data/android_widget.dart';
 import '../domain/models.dart';
 import '../domain/planning.dart';
 import 'app_icons.dart';
@@ -1368,6 +1369,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     body: ListView(
       padding: const EdgeInsets.all(22),
       children: [
+        if (Platform.isAndroid)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const AppIcon(AppGlyph.today, color: YushiColors.cobalt),
+            title: const Text('添加今日待办小组件'),
+            subtitle: const Text('在桌面查看待办；事项标题会显示在桌面上'),
+            onTap: () async {
+              try {
+                final supported = await AndroidWidget.pin();
+                if (context.mounted) {
+                  _snack(
+                    context,
+                    supported ? '请在桌面弹窗中确认添加' : '请长按桌面空白处 → 小组件 → 余时',
+                  );
+                }
+              } catch (_) {
+                if (context.mounted) _snack(context, '请长按桌面空白处 → 小组件 → 余时');
+              }
+            },
+          ),
         Text('数据，留在自己手里。', style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 8),
         Text(
