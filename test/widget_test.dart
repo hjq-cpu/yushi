@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:yushi/app_controller.dart';
 import 'package:yushi/data/local_repository.dart';
@@ -7,6 +8,52 @@ import 'package:yushi/domain/models.dart';
 import 'package:yushi/ui/app.dart';
 
 void main() {
+  testWidgets('计划长图包含全部事项及底部品牌', (tester) async {
+    sqfliteFfiInit();
+    final controller = AppController(
+      LocalRepository(databaseFactory: databaseFactoryFfi),
+    );
+    final now = DateTime.now();
+    final tasks = List.generate(
+      30,
+      (i) => TaskItem(
+        id: 'poster-$i',
+        title: '今日事项 ${i + 1}',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    final key = GlobalKey();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: RepaintBoundary(
+              key: key,
+              child: SizedBox(
+                width: 360,
+                child: PlanPoster(
+                  controller: controller,
+                  tasks: tasks,
+                  includeTimes: true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('今日事项 30'), findsOneWidget);
+    expect(find.text('余时'), findsOneWidget);
+    final boundary =
+        key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+    final rendered = await boundary.toImage();
+    expect(rendered.height, greaterThan(2000));
+    expect(rendered.height, boundary.size.height.ceil());
+    rendered.dispose();
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('首页首先呈现今天和快速记录', (tester) async {
     sqfliteFfiInit();
     final repository = LocalRepository(

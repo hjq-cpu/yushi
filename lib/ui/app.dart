@@ -1019,13 +1019,22 @@ class _SharePlanScreenState extends State<SharePlanScreen> {
   );
 
   Future<Uint8List> capture() async {
+    await precacheImage(
+      const AssetImage('assets/branding/app-icon.png'),
+      context,
+    );
     await WidgetsBinding.instance.endOfFrame;
     final boundary =
         key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-    final image = await boundary.toImage(pixelRatio: 3);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    if (data == null) throw StateError('图片生成失败');
-    return data.buffer.asUint8List();
+    final ratio = (12000 / boundary.size.height).clamp(1.0, 3.0);
+    final image = await boundary.toImage(pixelRatio: ratio);
+    try {
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) throw StateError('图片生成失败');
+      return data.buffer.asUint8List();
+    } finally {
+      image.dispose();
+    }
   }
 
   Future<void> save() async {
@@ -1076,7 +1085,10 @@ class PlanPoster extends StatelessWidget {
   final bool includeTimes;
   @override
   Widget build(BuildContext context) => Container(
-    color: YushiColors.background,
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      border: Border(top: BorderSide(color: YushiColors.cobalt, width: 6)),
+    ),
     padding: const EdgeInsets.fromLTRB(26, 28, 26, 30),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1084,17 +1096,18 @@ class PlanPoster extends StatelessWidget {
         Row(
           children: [
             Text(
-              '余时',
+              'TODAY / 今日',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontFamily: 'NotoSerifSC',
+                fontSize: 13,
+                color: YushiColors.cobalt,
                 fontWeight: FontWeight.w600,
-                letterSpacing: 3,
+                letterSpacing: 1,
               ),
             ),
             const Spacer(),
-            const Text(
-              'TODAY',
-              style: TextStyle(
+            Text(
+              '${tasks.length.toString().padLeft(2, '0')} 件安排',
+              style: const TextStyle(
                 fontFamily: null,
                 fontSize: 10,
                 letterSpacing: 2,
@@ -1152,6 +1165,11 @@ class PlanPoster extends StatelessWidget {
                                     : null,
                               ),
                         ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${tasks[i].isFocus ? '今日重点 · ' : ''}${_projectName(controller.snapshot, tasks[i])}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                         if (includeTimes)
                           Text(
                             [
@@ -1176,6 +1194,50 @@ class PlanPoster extends StatelessWidget {
           style: Theme.of(
             context,
           ).textTheme.titleMedium?.copyWith(color: YushiColors.cobalt),
+        ),
+        const SizedBox(height: 28),
+        const Divider(height: 1),
+        const SizedBox(height: 18),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.asset(
+                'assets/branding/app-icon.png',
+                width: 38,
+                height: 38,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '余时',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    '把时间留给在意的事',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: YushiColors.secondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              '${dateKey(DateTime.now())}\n${_time(DateTime.now().hour * 60 + DateTime.now().minute)} 生成',
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 10,
+                height: 1.6,
+                color: YushiColors.secondary,
+              ),
+            ),
+          ],
         ),
       ],
     ),
