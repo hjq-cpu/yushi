@@ -573,7 +573,15 @@ class WeekScreen extends StatelessWidget {
           '先看真实可用的时间，再决定把这一周交给什么。',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: () =>
+              showTaskEditor(context, controller, initialDate: today),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          icon: const AppIcon(AppGlyph.add, color: Colors.white),
+          label: const Text('添加本周事项'),
+        ),
+        const SizedBox(height: 12),
         for (var i = 0; i < 7; i++)
           _DaySection(
             day: start.add(Duration(days: i)),
@@ -1325,7 +1333,21 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
             ),
           ),
           const SizedBox(height: 18),
-          Text('安排一件具体的事', style: Theme.of(context).textTheme.headlineMedium),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '安排一件具体的事',
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton(
+                onPressed: busy ? null : save,
+                child: Text(busy ? '保存中…' : '加入计划'),
+              ),
+            ],
+          ),
           const SizedBox(height: 14),
           TextField(
             controller: title,
@@ -1426,13 +1448,6 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
             onChanged: (value) => setState(() => private = value),
           ),
           const SizedBox(height: 8),
-          FilledButton(
-            onPressed: busy ? null : save,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-            ),
-            child: const Text('加入计划'),
-          ),
         ],
       ),
     ),
@@ -1478,7 +1493,10 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
         isPrivate: private,
         recurrence: RecurrenceRule(type: recurrence, weeklyTarget: 1),
       );
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        _snack(context, '已加入 ${_monthDay(day)}的计划');
+        Navigator.pop(context);
+      }
     } catch (e) {
       if (mounted) _snack(context, '保存失败：$e');
     } finally {

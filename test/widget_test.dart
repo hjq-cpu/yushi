@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:yushi/app_controller.dart';
 import 'package:yushi/data/local_repository.dart';
+import 'package:yushi/domain/models.dart';
 import 'package:yushi/ui/app.dart';
 
 void main() {
@@ -33,7 +34,7 @@ void main() {
 
     await tester.pumpWidget(YushiApp(controller: controller));
     await tester.tap(find.text('项目'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('新建项目'));
     await tester.pumpAndSettle();
 
@@ -50,5 +51,47 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
     await repository.close();
+  });
+
+  testWidgets('节奏页点击日期可添加并显示事项', (tester) async {
+    sqfliteFfiInit();
+    final repository = LocalRepository(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: inMemoryDatabasePath,
+    );
+    await tester.runAsync(() => repository.save(AppSnapshot.empty()));
+    final controller = AppController(repository)..loading = false;
+
+    await tester.pumpWidget(YushiApp(controller: controller));
+    await tester.tap(find.text('节奏'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('添加本周事项'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('安排一件具体的事'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, '周末骑行');
+    expect(
+      tester.widget<TextField>(find.byType(TextField).first).controller?.text,
+      '周末骑行',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, '加入计划'));
+    await tester.pump();
+    expect(find.text('保存中…'), findsOneWidget);
+    await tester.runAsync(() async {
+      for (var i = 0; i < 100 && controller.snapshot.tasks.isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    });
+    await tester.pumpAndSettle();
+
+    expect(controller.snapshot.tasks.single.title, '周末骑行');
+    expect(find.text('安排一件具体的事'), findsNothing);
+    expect(find.textContaining('已加入'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.runAsync(repository.close);
   });
 }
