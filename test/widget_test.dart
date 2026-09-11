@@ -7,7 +7,55 @@ import 'package:yushi/data/local_repository.dart';
 import 'package:yushi/domain/models.dart';
 import 'package:yushi/ui/app.dart';
 
+Widget _appWithoutIntroduction(AppController controller) {
+  controller.snapshot = controller.snapshot.copyWith(
+    settings: controller.snapshot.settings.copyWith(onboardingCompleted: true),
+  );
+  return YushiApp(controller: controller);
+}
+
 void main() {
+  testWidgets('理念偏好保存后重新启动不再提示', (tester) async {
+    sqfliteFfiInit();
+    final repository = LocalRepository(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: inMemoryDatabasePath,
+    );
+    await tester.runAsync(() => repository.save(AppSnapshot.empty()));
+    final controller = AppController(repository)..loading = false;
+    await tester.pumpWidget(YushiApp(controller: controller));
+    await tester.pumpAndSettle();
+    expect(find.text('给在意的事，留一点时间'), findsOneWidget);
+    await tester.tap(find.text('开始今天'));
+    await tester.pumpAndSettle();
+    expect(controller.snapshot.settings.onboardingCompleted, isFalse);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(YushiApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('以后不再提示'));
+    await tester.tap(find.text('以后不再提示'));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await tester.tap(find.text('开始今天'));
+      for (
+        var i = 0;
+        i < 100 && !controller.snapshot.settings.onboardingCompleted;
+        i++
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    });
+    await tester.pumpAndSettle();
+    final restored = AppController(repository);
+    await tester.runAsync(restored.initialize);
+    expect(restored.snapshot.settings.onboardingCompleted, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(YushiApp(controller: restored));
+    await tester.pumpAndSettle();
+    expect(find.text('给在意的事，留一点时间'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(repository.close);
+  });
   testWidgets('计划长图包含全部事项及底部品牌', (tester) async {
     sqfliteFfiInit();
     final controller = AppController(
@@ -63,7 +111,7 @@ void main() {
     final controller = AppController(repository);
     controller.loading = false;
 
-    await tester.pumpWidget(YushiApp(controller: controller));
+    await tester.pumpWidget(_appWithoutIntroduction(controller));
     await tester.pump();
 
     expect(find.textContaining('把时间留给'), findsOneWidget);
@@ -79,7 +127,7 @@ void main() {
     );
     final controller = AppController(repository)..loading = false;
 
-    await tester.pumpWidget(YushiApp(controller: controller));
+    await tester.pumpWidget(_appWithoutIntroduction(controller));
     await tester.tap(find.text('项目'));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('新建项目'));
@@ -109,7 +157,7 @@ void main() {
     await tester.runAsync(() => repository.save(AppSnapshot.empty()));
     final controller = AppController(repository)..loading = false;
 
-    await tester.pumpWidget(YushiApp(controller: controller));
+    await tester.pumpWidget(_appWithoutIntroduction(controller));
     await tester.tap(find.text('节奏'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('添加本周事项'));
@@ -179,7 +227,7 @@ void main() {
       ..snapshot = snapshot
       ..loading = false;
 
-    await tester.pumpWidget(YushiApp(controller: controller));
+    await tester.pumpWidget(_appWithoutIntroduction(controller));
     await tester.tap(find.text('项目'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('管理项目'));

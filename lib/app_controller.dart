@@ -205,6 +205,12 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> dismissIntroductionPermanently() => _commit(
+    snapshot.copyWith(
+      settings: snapshot.settings.copyWith(onboardingCompleted: true),
+    ),
+  );
+
   Future<void> _commit(AppSnapshot next) async {
     error = null;
     try {

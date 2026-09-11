@@ -43,7 +43,9 @@ Android 安装包：
 flutter build apk --release
 ```
 
-本次已构建的可安装文件位于 `release/yushi-v0.1.6.apk`。
+本次已构建的可安装文件位于 `release/yushi-v0.1.7.apk`。
+
+启动首页会介绍产品理念；勾选“以后不再提示”并点击“开始今天”后，偏好保存在本地，后续启动不再显示。
 
 ## 文档
 

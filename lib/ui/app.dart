@@ -40,6 +40,21 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int index = 0;
+  bool introductionHandled = false;
+
+  void scheduleIntroduction() {
+    if (introductionHandled || widget.controller.error != null) return;
+    introductionHandled = true;
+    if (widget.controller.snapshot.settings.onboardingCompleted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => _IntroductionDialog(controller: widget.controller),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -48,6 +63,7 @@ class _HomeShellState extends State<HomeShell> {
       if (widget.controller.loading) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
+      scheduleIntroduction();
       final pages = [
         TodayScreen(controller: widget.controller),
         WeekScreen(controller: widget.controller),
@@ -133,6 +149,97 @@ class _HomeShellState extends State<HomeShell> {
         ),
       );
     },
+  );
+}
+
+class _IntroductionDialog extends StatefulWidget {
+  const _IntroductionDialog({required this.controller});
+  final AppController controller;
+
+  @override
+  State<_IntroductionDialog> createState() => _IntroductionDialogState();
+}
+
+class _IntroductionDialogState extends State<_IntroductionDialog> {
+  bool neverAgain = false;
+  bool saving = false;
+  String? error;
+
+  Future<void> continueToToday() async {
+    if (saving) return;
+    setState(() {
+      saving = true;
+      error = null;
+    });
+    try {
+      if (neverAgain) await widget.controller.dismissIntroductionPermanently();
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          saving = false;
+          error = '偏好保存失败，请重试';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: !saving,
+    child: AlertDialog(
+      scrollable: true,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset(
+              'assets/branding/app-icon.png',
+              width: 48,
+              height: 48,
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text('给在意的事，留一点时间'),
+        ],
+      ),
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('工作之外，你还有想做的项目、想学的东西，以及需要照顾的生活。余时帮助你从这些事情里，选出今天值得投入的一步。'),
+          const SizedBox(height: 18),
+          const Text('有所选择', style: TextStyle(fontWeight: FontWeight.w700)),
+          const Text('今天先推进一件重要的事，让具体行动有一个起点。'),
+          const SizedBox(height: 12),
+          const Text('适可而止', style: TextStyle(fontWeight: FontWeight.w700)),
+          const Text('写下做到哪里就够了。完成之后，也可以安心停下。'),
+          const SizedBox(height: 12),
+          const Text('允许留白', style: TextStyle(fontWeight: FontWeight.w700)),
+          const Text('骑行、学习、陪伴和休息，都值得拥有时间。计划改变时，也允许自己调整。'),
+          const SizedBox(height: 16),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: const Text('以后不再提示'),
+            value: neverAgain,
+            onChanged: saving
+                ? null
+                : (value) => setState(() => neverAgain = value ?? false),
+          ),
+          if (error != null)
+            Text(error!, style: const TextStyle(color: YushiColors.danger)),
+        ],
+      ),
+      actions: [
+        FilledButton(
+          onPressed: saving ? null : continueToToday,
+          child: Text(saving ? '保存中…' : '开始今天'),
+        ),
+      ],
+    ),
   );
 }
 
