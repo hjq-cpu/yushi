@@ -63,9 +63,11 @@ class _HomeShellState extends State<HomeShell> {
             children: [
               Text(
                 '余时',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(letterSpacing: 3),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontFamily: 'NotoSerifSC',
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 3,
+                ),
               ),
               const SizedBox(width: 9),
               const Padding(
@@ -993,9 +995,11 @@ class PlanPoster extends StatelessWidget {
           children: [
             Text(
               '余时',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(letterSpacing: 3),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontFamily: 'NotoSerifSC',
+                fontWeight: FontWeight.w600,
+                letterSpacing: 3,
+              ),
             ),
             const Spacer(),
             const Text(

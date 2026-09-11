@@ -43,7 +43,7 @@ Android 安装包：
 flutter build apk --release
 ```
 
-本次已构建的可安装文件位于 `release/yushi-v0.1.2.apk`。
+本次已构建的可安装文件位于 `release/yushi-v0.1.3.apk`。
 
 ## 文档
 
