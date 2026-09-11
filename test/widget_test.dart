@@ -22,4 +22,33 @@ void main() {
     expect(find.byType(TextField), findsOneWidget);
     expect(find.text('今天'), findsOneWidget);
   });
+
+  testWidgets('创建项目后安全关闭弹窗并显示项目', (tester) async {
+    sqfliteFfiInit();
+    final repository = LocalRepository(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: inMemoryDatabasePath,
+    );
+    final controller = AppController(repository)..loading = false;
+
+    await tester.pumpWidget(YushiApp(controller: controller));
+    await tester.tap(find.text('项目'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('新建项目'));
+    await tester.pumpAndSettle();
+
+    final fields = find.byType(TextField);
+    expect(fields, findsNWidgets(2));
+    await tester.enterText(fields.first, '骑行计划');
+    await tester.enterText(fields.last, '让身体和注意力重新流动');
+    await tester.tap(find.text('创建'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('骑行计划'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    await repository.close();
+  });
 }

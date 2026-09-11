@@ -1542,7 +1542,6 @@ Future<void> _showAdjust(
   TaskItem task,
   DateTime day,
 ) async {
-  final note = TextEditingController(text: task.note);
   await showModalBottomSheet<void>(
     context: context,
     backgroundColor: YushiColors.background,
@@ -1583,58 +1582,88 @@ Future<void> _showAdjust(
               if (sheetContext.mounted) Navigator.pop(sheetContext);
             },
           ),
-          TextField(
-            controller: note,
+          InputDecorator(
             decoration: const InputDecoration(labelText: '下次从哪里继续？'),
-            readOnly: true,
+            child: Text(task.note.isEmpty ? '还没有记录' : task.note),
           ),
         ],
       ),
     ),
   );
-  note.dispose();
 }
 
-Future<void> _addProject(BuildContext context, AppController controller) async {
+Future<void> _addProject(BuildContext context, AppController controller) =>
+    showDialog<void>(
+      context: context,
+      builder: (_) => _AddProjectDialog(controller: controller),
+    );
+
+class _AddProjectDialog extends StatefulWidget {
+  const _AddProjectDialog({required this.controller});
+
+  final AppController controller;
+
+  @override
+  State<_AddProjectDialog> createState() => _AddProjectDialogState();
+}
+
+class _AddProjectDialogState extends State<_AddProjectDialog> {
   final title = TextEditingController();
   final reason = TextEditingController();
-  await showDialog<void>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('新建项目'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: title,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: '项目名称'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: reason,
-            decoration: const InputDecoration(labelText: '为什么在意它（可选）'),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('取消'),
+  bool saving = false;
+
+  @override
+  void dispose() {
+    title.dispose();
+    reason.dispose();
+    super.dispose();
+  }
+
+  Future<void> save() async {
+    if (title.text.trim().isEmpty || saving) return;
+    setState(() => saving = true);
+    try {
+      await widget.controller.addProject(title.text, reason.text);
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (mounted) {
+        setState(() => saving = false);
+        _snack(context, '创建失败：$error');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('新建项目'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: title,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: '项目名称'),
         ),
-        FilledButton(
-          onPressed: () async {
-            if (title.text.trim().isEmpty) return;
-            await controller.addProject(title.text, reason.text);
-            if (dialogContext.mounted) Navigator.pop(dialogContext);
-          },
-          child: const Text('创建'),
+        const SizedBox(height: 12),
+        TextField(
+          controller: reason,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => save(),
+          decoration: const InputDecoration(labelText: '为什么在意它（可选）'),
         ),
       ],
     ),
+    actions: [
+      TextButton(
+        onPressed: saving ? null : () => Navigator.pop(context),
+        child: const Text('取消'),
+      ),
+      FilledButton(
+        onPressed: saving ? null : save,
+        child: Text(saving ? '保存中…' : '创建'),
+      ),
+    ],
   );
-  title.dispose();
-  reason.dispose();
 }
 
 Future<void> _scheduleInbox(
