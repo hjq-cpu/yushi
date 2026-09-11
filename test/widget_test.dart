@@ -94,4 +94,54 @@ void main() {
     await tester.pump();
     await tester.runAsync(repository.close);
   });
+
+  testWidgets('归档项目后移入归档区并可恢复', (tester) async {
+    sqfliteFfiInit();
+    final repository = LocalRepository(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: inMemoryDatabasePath,
+    );
+    final now = DateTime(2026, 9, 11);
+    final project = ProjectItem(
+      id: 'project-archive',
+      title: '旧项目',
+      createdAt: now,
+      updatedAt: now,
+    );
+    final snapshot = AppSnapshot(projects: [project]);
+    await tester.runAsync(() => repository.save(snapshot));
+    final controller = AppController(repository)
+      ..snapshot = snapshot
+      ..loading = false;
+
+    await tester.pumpWidget(YushiApp(controller: controller));
+    await tester.tap(find.text('项目'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(PopupMenuButton<ProjectStatus>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('归档'));
+    await tester.pump();
+    await tester.runAsync(() async {
+      for (
+        var i = 0;
+        i < 100 &&
+            controller.snapshot.projects.single.status !=
+                ProjectStatus.archived;
+        i++
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    });
+    await tester.pumpAndSettle();
+
+    expect(controller.snapshot.projects.single.status, ProjectStatus.archived);
+    expect(find.text('已归档项目（1）'), findsOneWidget);
+    expect(find.textContaining('项目已归档'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.runAsync(repository.close);
+  });
 }

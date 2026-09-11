@@ -705,6 +705,12 @@ class ProjectsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final projects = controller.snapshot.projects;
+    final currentProjects = projects
+        .where((project) => project.status != ProjectStatus.archived)
+        .toList();
+    final archivedProjects = projects
+        .where((project) => project.status == ProjectStatus.archived)
+        .toList();
     final inbox = controller.snapshot.tasks
         .where((task) => task.status == TaskStatus.inbox)
         .toList();
@@ -728,14 +734,16 @@ class ProjectsScreen extends StatelessWidget {
           style: Theme.of(context).textTheme.headlineLarge,
         ),
         const SizedBox(height: 22),
-        if (projects.isEmpty)
+        if (currentProjects.isEmpty)
           Text(
-            '还没有项目。项目用来保存长期方向，今天只需要做下一步。',
+            archivedProjects.isEmpty
+                ? '还没有项目。项目用来保存长期方向，今天只需要做下一步。'
+                : '当前没有进行中的项目，已归档内容保留在下方。',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
-        for (var i = 0; i < projects.length; i++)
+        for (var i = 0; i < currentProjects.length; i++)
           _ProjectRow(
-            project: projects[i],
+            project: currentProjects[i],
             index: i + 1,
             controller: controller,
           ),
@@ -745,6 +753,24 @@ class ProjectsScreen extends StatelessWidget {
           icon: const AppIcon(AppGlyph.add),
           label: const Text('新建项目'),
         ),
+        if (archivedProjects.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: EdgeInsets.zero,
+            leading: const AppIcon(AppGlyph.archive),
+            title: Text('已归档项目（${archivedProjects.length}）'),
+            subtitle: const Text('保留历史，需要时可以恢复'),
+            children: [
+              for (var i = 0; i < archivedProjects.length; i++)
+                _ProjectRow(
+                  project: archivedProjects[i],
+                  index: i + 1,
+                  controller: controller,
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: 25),
         Row(
           children: [
@@ -844,13 +870,25 @@ class _ProjectRow extends StatelessWidget {
           ),
           PopupMenuButton<ProjectStatus>(
             icon: const AppIcon(AppGlyph.more),
-            onSelected: (status) => controller.updateProject(
-              project.copyWith(status: status, updatedAt: DateTime.now()),
-            ),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: ProjectStatus.active, child: Text('继续')),
-              PopupMenuItem(value: ProjectStatus.paused, child: Text('暂停')),
-              PopupMenuItem(value: ProjectStatus.archived, child: Text('归档')),
+            onSelected: (status) =>
+                _changeProjectStatus(context, controller, project, status),
+            itemBuilder: (_) => [
+              if (project.status != ProjectStatus.active)
+                const PopupMenuItem(
+                  value: ProjectStatus.active,
+                  child: Text('恢复为进行中'),
+                ),
+              if (project.status != ProjectStatus.paused &&
+                  project.status != ProjectStatus.archived)
+                const PopupMenuItem(
+                  value: ProjectStatus.paused,
+                  child: Text('暂停'),
+                ),
+              if (project.status != ProjectStatus.archived)
+                const PopupMenuItem(
+                  value: ProjectStatus.archived,
+                  child: Text('归档'),
+                ),
             ],
           ),
         ],
@@ -1546,8 +1584,17 @@ Future<void> _showTaskDetails(
           ),
           TextButton.icon(
             onPressed: () async {
-              await controller.archiveTask(task);
-              if (sheetContext.mounted) Navigator.pop(sheetContext);
+              try {
+                await controller.archiveTask(task);
+                if (sheetContext.mounted) {
+                  _snack(sheetContext, '已归档任务，记录仍然保留');
+                  Navigator.pop(sheetContext);
+                }
+              } catch (error) {
+                if (sheetContext.mounted) {
+                  _snack(sheetContext, '归档失败：$error');
+                }
+              }
             },
             icon: const AppIcon(AppGlyph.archive),
             label: const Text('归档'),
@@ -1600,8 +1647,17 @@ Future<void> _showAdjust(
             title: const Text('暂时放下'),
             subtitle: const Text('归档任务，以后仍可在备份中保留'),
             onTap: () async {
-              await controller.archiveTask(task);
-              if (sheetContext.mounted) Navigator.pop(sheetContext);
+              try {
+                await controller.archiveTask(task);
+                if (sheetContext.mounted) {
+                  _snack(sheetContext, '已归档任务，记录仍然保留');
+                  Navigator.pop(sheetContext);
+                }
+              } catch (error) {
+                if (sheetContext.mounted) {
+                  _snack(sheetContext, '归档失败：$error');
+                }
+              }
             },
           ),
           InputDecorator(
@@ -1686,6 +1742,29 @@ class _AddProjectDialogState extends State<_AddProjectDialog> {
       ),
     ],
   );
+}
+
+Future<void> _changeProjectStatus(
+  BuildContext context,
+  AppController controller,
+  ProjectItem project,
+  ProjectStatus status,
+) async {
+  try {
+    await controller.updateProject(
+      project.copyWith(status: status, updatedAt: DateTime.now()),
+    );
+    if (context.mounted) {
+      final message = switch (status) {
+        ProjectStatus.active => '项目已恢复',
+        ProjectStatus.paused => '项目已暂停',
+        ProjectStatus.archived => '项目已归档，可从“已归档项目”恢复',
+      };
+      _snack(context, message);
+    }
+  } catch (error) {
+    if (context.mounted) _snack(context, '操作失败：$error');
+  }
 }
 
 Future<void> _scheduleInbox(
