@@ -714,6 +714,9 @@ class ProjectsScreen extends StatelessWidget {
     final inbox = controller.snapshot.tasks
         .where((task) => task.status == TaskStatus.inbox)
         .toList();
+    final archivedTasks = controller.snapshot.tasks
+        .where((task) => task.status == TaskStatus.archived)
+        .toList();
     return ListView(
       padding: const EdgeInsets.fromLTRB(22, 20, 22, 34),
       children: [
@@ -771,6 +774,43 @@ class ProjectsScreen extends StatelessWidget {
             ],
           ),
         ],
+        if (archivedTasks.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: EdgeInsets.zero,
+            leading: const AppIcon(AppGlyph.archive),
+            title: Text('已归档任务（${archivedTasks.length}）'),
+            subtitle: const Text('可以恢复，也可以永久删除'),
+            children: [
+              for (final task in archivedTasks)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(task.title),
+                  subtitle: Text(_projectName(controller.snapshot, task)),
+                  trailing: PopupMenuButton<_ArchivedTaskAction>(
+                    tooltip: '管理已归档任务',
+                    onSelected: (action) => _handleArchivedTaskAction(
+                      context,
+                      controller,
+                      task,
+                      action,
+                    ),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: _ArchivedTaskAction.restore,
+                        child: Text('恢复'),
+                      ),
+                      PopupMenuItem(
+                        value: _ArchivedTaskAction.delete,
+                        child: Text('永久删除'),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: 25),
         Row(
           children: [
@@ -804,6 +844,10 @@ class ProjectsScreen extends StatelessWidget {
     );
   }
 }
+
+enum _ProjectAction { restore, pause, archive, delete }
+
+enum _ArchivedTaskAction { restore, delete }
 
 class _ProjectRow extends StatelessWidget {
   const _ProjectRow({
@@ -868,26 +912,34 @@ class _ProjectRow extends StatelessWidget {
               ],
             ),
           ),
-          PopupMenuButton<ProjectStatus>(
+          PopupMenuButton<_ProjectAction>(
+            tooltip: project.status == ProjectStatus.archived
+                ? '管理已归档项目'
+                : '管理项目',
             icon: const AppIcon(AppGlyph.more),
-            onSelected: (status) =>
-                _changeProjectStatus(context, controller, project, status),
+            onSelected: (action) =>
+                _handleProjectAction(context, controller, project, action),
             itemBuilder: (_) => [
               if (project.status != ProjectStatus.active)
                 const PopupMenuItem(
-                  value: ProjectStatus.active,
+                  value: _ProjectAction.restore,
                   child: Text('恢复为进行中'),
                 ),
               if (project.status != ProjectStatus.paused &&
                   project.status != ProjectStatus.archived)
                 const PopupMenuItem(
-                  value: ProjectStatus.paused,
+                  value: _ProjectAction.pause,
                   child: Text('暂停'),
                 ),
               if (project.status != ProjectStatus.archived)
                 const PopupMenuItem(
-                  value: ProjectStatus.archived,
+                  value: _ProjectAction.archive,
                   child: Text('归档'),
+                ),
+              if (project.status == ProjectStatus.archived)
+                const PopupMenuItem(
+                  value: _ProjectAction.delete,
+                  child: Text('永久删除'),
                 ),
             ],
           ),
@@ -1744,12 +1796,22 @@ class _AddProjectDialogState extends State<_AddProjectDialog> {
   );
 }
 
-Future<void> _changeProjectStatus(
+Future<void> _handleProjectAction(
   BuildContext context,
   AppController controller,
   ProjectItem project,
-  ProjectStatus status,
+  _ProjectAction action,
 ) async {
+  if (action == _ProjectAction.delete) {
+    await _confirmDeleteProject(context, controller, project);
+    return;
+  }
+  final status = switch (action) {
+    _ProjectAction.restore => ProjectStatus.active,
+    _ProjectAction.pause => ProjectStatus.paused,
+    _ProjectAction.archive => ProjectStatus.archived,
+    _ProjectAction.delete => throw StateError('删除操作应单独处理'),
+  };
   try {
     await controller.updateProject(
       project.copyWith(status: status, updatedAt: DateTime.now()),
@@ -1764,6 +1826,108 @@ Future<void> _changeProjectStatus(
     }
   } catch (error) {
     if (context.mounted) _snack(context, '操作失败：$error');
+  }
+}
+
+Future<void> _confirmDeleteProject(
+  BuildContext context,
+  AppController controller,
+  ProjectItem project,
+) async {
+  final taskIds = controller.snapshot.tasks
+      .where((task) => task.projectId == project.id)
+      .map((task) => task.id)
+      .toSet();
+  final recordCount = controller.snapshot.completions
+      .where((entry) => taskIds.contains(entry.taskId))
+      .length;
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text('永久删除“${project.title}”？'),
+      content: Text('将同时删除 ${taskIds.length} 条任务和 $recordCount 条完成记录。此操作无法撤销。'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          style: FilledButton.styleFrom(backgroundColor: YushiColors.danger),
+          child: const Text('永久删除'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    await controller.deleteProject(project);
+    if (messenger.mounted) {
+      messenger.showSnackBar(const SnackBar(content: Text('项目及关联记录已删除')));
+    }
+  } catch (error) {
+    if (messenger.mounted) {
+      messenger.showSnackBar(SnackBar(content: Text('删除失败：$error')));
+    }
+  }
+}
+
+Future<void> _handleArchivedTaskAction(
+  BuildContext context,
+  AppController controller,
+  TaskItem task,
+  _ArchivedTaskAction action,
+) async {
+  if (action == _ArchivedTaskAction.delete) {
+    await _confirmDeleteTask(context, controller, task);
+    return;
+  }
+  try {
+    await controller.restoreTask(task);
+    if (context.mounted) _snack(context, '任务已恢复');
+  } catch (error) {
+    if (context.mounted) _snack(context, '恢复失败：$error');
+  }
+}
+
+Future<void> _confirmDeleteTask(
+  BuildContext context,
+  AppController controller,
+  TaskItem task,
+) async {
+  final recordCount = controller.snapshot.completions
+      .where((entry) => entry.taskId == task.id)
+      .length;
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text('永久删除“${task.title}”？'),
+      content: Text('将同时删除 $recordCount 条完成记录。此操作无法撤销。'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          style: FilledButton.styleFrom(backgroundColor: YushiColors.danger),
+          child: const Text('永久删除'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    await controller.deleteTask(task);
+    if (messenger.mounted) {
+      messenger.showSnackBar(const SnackBar(content: Text('任务及完成记录已删除')));
+    }
+  } catch (error) {
+    if (messenger.mounted) {
+      messenger.showSnackBar(SnackBar(content: Text('删除失败：$error')));
+    }
   }
 }
 

@@ -134,6 +134,33 @@ class AppController extends ChangeNotifier {
     await _commit(snapshot.copyWith(tasks: tasks));
   }
 
+  Future<void> restoreTask(TaskItem task) async {
+    final tasks = snapshot.tasks
+        .map(
+          (item) => item.id == task.id
+              ? item.copyWith(
+                  status: item.plannedDate == null
+                      ? TaskStatus.inbox
+                      : TaskStatus.planned,
+                  updatedAt: DateTime.now(),
+                )
+              : item,
+        )
+        .toList();
+    await _commit(snapshot.copyWith(tasks: tasks));
+  }
+
+  Future<void> deleteTask(TaskItem task) async {
+    await _commit(
+      snapshot.copyWith(
+        tasks: snapshot.tasks.where((item) => item.id != task.id).toList(),
+        completions: snapshot.completions
+            .where((entry) => entry.taskId != task.id)
+            .toList(),
+      ),
+    );
+  }
+
   Future<void> addProject(String title, String reason) async {
     final now = DateTime.now();
     final project = ProjectItem(
@@ -151,6 +178,26 @@ class AppController extends ChangeNotifier {
         .map((item) => item.id == project.id ? project : item)
         .toList();
     await _commit(snapshot.copyWith(projects: projects));
+  }
+
+  Future<void> deleteProject(ProjectItem project) async {
+    final taskIds = snapshot.tasks
+        .where((task) => task.projectId == project.id)
+        .map((task) => task.id)
+        .toSet();
+    await _commit(
+      snapshot.copyWith(
+        projects: snapshot.projects
+            .where((item) => item.id != project.id)
+            .toList(),
+        tasks: snapshot.tasks
+            .where((task) => !taskIds.contains(task.id))
+            .toList(),
+        completions: snapshot.completions
+            .where((entry) => !taskIds.contains(entry.taskId))
+            .toList(),
+      ),
+    );
   }
 
   Future<void> applyImport(String source, ImportMode mode) async {

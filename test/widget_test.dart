@@ -108,7 +108,25 @@ void main() {
       createdAt: now,
       updatedAt: now,
     );
-    final snapshot = AppSnapshot(projects: [project]);
+    final task = TaskItem(
+      id: 'task-in-project',
+      title: '旧任务',
+      projectId: project.id,
+      status: TaskStatus.planned,
+      plannedDate: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final completion = CompletionEntry(
+      taskId: task.id,
+      date: now,
+      updatedAt: now,
+    );
+    final snapshot = AppSnapshot(
+      projects: [project],
+      tasks: [task],
+      completions: [completion],
+    );
     await tester.runAsync(() => repository.save(snapshot));
     final controller = AppController(repository)
       ..snapshot = snapshot
@@ -117,7 +135,7 @@ void main() {
     await tester.pumpWidget(YushiApp(controller: controller));
     await tester.tap(find.text('项目'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(PopupMenuButton<ProjectStatus>));
+    await tester.tap(find.byTooltip('管理项目'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('归档'));
     await tester.pump();
@@ -139,6 +157,27 @@ void main() {
     expect(find.text('已归档项目（1）'), findsOneWidget);
     expect(find.textContaining('项目已归档'), findsOneWidget);
     expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('已归档项目（1）'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('管理已归档项目'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('永久删除'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('1 条任务和 1 条完成记录'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '永久删除'));
+    await tester.pump();
+    await tester.runAsync(() async {
+      for (var i = 0; i < 100 && controller.snapshot.projects.isNotEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    });
+    await tester.pumpAndSettle();
+
+    expect(controller.snapshot.projects, isEmpty);
+    expect(controller.snapshot.tasks, isEmpty);
+    expect(controller.snapshot.completions, isEmpty);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
