@@ -28,6 +28,7 @@ enum AppGlyph {
   chevronRight,
   image,
   delete,
+  insights,
 }
 
 class AppIcon extends StatelessWidget {
@@ -64,6 +65,7 @@ class AppIcon extends StatelessWidget {
     AppGlyph.chevronRight: Icons.chevron_right_rounded,
     AppGlyph.image: Icons.image_outlined,
     AppGlyph.delete: Icons.delete_outline_rounded,
+    AppGlyph.insights: Icons.insights_rounded,
   };
 
   @override

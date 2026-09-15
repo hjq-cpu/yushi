@@ -15,6 +15,136 @@ Widget _appWithoutIntroduction(AppController controller) {
 }
 
 void main() {
+  testWidgets('节奏页支持月份切换和返回本月', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(393, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    sqfliteFfiInit();
+    final controller = AppController(
+      LocalRepository(databaseFactory: databaseFactoryFfi),
+    )..loading = false;
+    final today = DateTime.now();
+    await tester.pumpWidget(_appWithoutIntroduction(controller));
+    await tester.tap(find.text('节奏'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('有安排，'), findsOneWidget);
+    expect(find.text('先看真实可用的时间，再决定把这一周交给什么。'), findsOneWidget);
+    expect(tester.getSize(find.text('周')).width, lessThan(40));
+    await tester.tap(find.text('月'));
+    await tester.pumpAndSettle();
+    expect(find.text('${today.year} 年 ${today.month} 月'), findsOneWidget);
+    expect(find.text('添加本月事项'), findsOneWidget);
+
+    // Navigate through a full year, including February and the year boundary.
+    for (var offset = 1; offset <= 13; offset++) {
+      await tester.tap(find.byTooltip('上一月'));
+      await tester.pumpAndSettle();
+      final month = DateTime(today.year, today.month - offset);
+      final days = DateTime(month.year, month.month + 1, 0).day;
+      expect(find.text('${month.year} 年 ${month.month} 月'), findsOneWidget);
+      expect(
+        find.byKey(
+          ValueKey(
+            'calendar-${dateKey(DateTime(month.year, month.month, days))}',
+          ),
+        ),
+        findsOneWidget,
+      );
+    }
+    await tester.tap(find.byTooltip('下一月'));
+    await tester.pumpAndSettle();
+    final previousYear = DateTime(today.year, today.month - 12);
+    expect(
+      find.text('${previousYear.year} 年 ${previousYear.month} 月'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('本月'));
+    await tester.pumpAndSettle();
+    expect(find.text('${today.year} 年 ${today.month} 月'), findsOneWidget);
+    await tester.tap(find.text('周'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('上一周'));
+    await tester.pumpAndSettle();
+    expect(find.text('添加此周事项'), findsOneWidget);
+    await tester.tap(find.text('本周'));
+    await tester.pumpAndSettle();
+    expect(find.text('添加本周事项'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('月历选择日期只展示当天事项', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(420, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    sqfliteFfiInit();
+    final controller = AppController(
+      LocalRepository(databaseFactory: databaseFactoryFfi),
+    )..loading = false;
+    final now = DateTime.now();
+    final first = DateTime(now.year, now.month);
+    final second = DateTime(now.year, now.month, 2);
+    controller.snapshot = controller.snapshot.copyWith(
+      tasks: [
+        for (final day in [first, second])
+          TaskItem(
+            id: 'calendar-${day.day}',
+            title: '月历事项${day.day}',
+            status: TaskStatus.planned,
+            plannedDate: day,
+            createdAt: first,
+            updatedAt: first,
+          ),
+      ],
+    );
+    await tester.pumpWidget(_appWithoutIntroduction(controller));
+    await tester.tap(find.text('节奏'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('月'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('calendar-${dateKey(first)}')));
+    await tester.pumpAndSettle();
+    expect(find.text('月历事项1'), findsOneWidget);
+    expect(find.text('月历事项2'), findsNothing);
+    await tester.tap(find.byKey(ValueKey('calendar-${dateKey(second)}')));
+    await tester.pumpAndSettle();
+    expect(find.text('月历事项1'), findsNothing);
+    expect(find.text('月历事项2'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('节奏页可以分析当前周', (tester) async {
+    sqfliteFfiInit();
+    final repository = LocalRepository(databaseFactory: databaseFactoryFfi);
+    final controller = AppController(repository)..loading = false;
+    final today = dateOnly(DateTime.now());
+    final task = TaskItem(
+      id: 'weekly-analysis-task',
+      title: '完成周分析',
+      status: TaskStatus.planned,
+      plannedDate: today,
+      createdAt: today,
+      updatedAt: today,
+    );
+    controller.snapshot = controller.snapshot.copyWith(
+      tasks: [task],
+      completions: [
+        CompletionEntry(taskId: task.id, date: today, updatedAt: today),
+      ],
+    );
+
+    await tester.pumpWidget(_appWithoutIntroduction(controller));
+    await tester.tap(find.text('节奏'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('分析本周'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('本周分析'), findsOneWidget);
+    expect(find.text('安排次数'), findsOneWidget);
+    expect(find.text('完成次数'), findsOneWidget);
+    expect(find.text('100%'), findsOneWidget);
+    expect(find.text('留白 6 天'), findsOneWidget);
+    expect(find.textContaining('完成 1 项'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('理念偏好保存后重新启动不再提示', (tester) async {
     sqfliteFfiInit();
     final repository = LocalRepository(
@@ -183,6 +313,30 @@ void main() {
     expect(controller.snapshot.tasks.single.title, '周末骑行');
     expect(find.text('安排一件具体的事'), findsNothing);
     expect(find.textContaining('已加入'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('周末骑行'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('周末骑行'));
+    await tester.pumpAndSettle();
+    expect(find.text('标记完成'), findsOneWidget);
+    await tester.tap(find.text('永久删除'));
+    await tester.pumpAndSettle();
+    expect(find.text('永久删除“周末骑行”？'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '永久删除'));
+    await tester.pump();
+    await tester.runAsync(() async {
+      for (var i = 0; i < 100 && controller.snapshot.tasks.isNotEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    });
+    await tester.pumpAndSettle();
+    expect(controller.snapshot.tasks, isEmpty);
+    expect(find.text('周末骑行'), findsNothing);
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());

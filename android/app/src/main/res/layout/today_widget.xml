@@ -1,11 +1,82 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:padding="16dp" android:background="@drawable/widget_background">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
-        <TextView android:id="@+id/widget_heading" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="余时 · 今日待办" android:textColor="#18243C" android:textSize="18sp" android:textStyle="bold" />
-        <TextView android:id="@+id/widget_refresh" android:layout_width="48dp" android:layout_height="40dp" android:gravity="center" android:text="刷新" android:contentDescription="刷新今日待办" android:textColor="#2F5CF3" android:textSize="13sp" />
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/widget_heading"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="今天"
+            android:textColor="#18243C"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_refresh"
+            android:layout_width="44dp"
+            android:layout_height="48dp"
+            android:contentDescription="刷新今日待办"
+            android:gravity="center"
+            android:text="刷新"
+            android:textColor="#2F5CF3"
+            android:textSize="15sp" />
     </LinearLayout>
-    <TextView android:id="@+id/widget_progress" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="今天，先做在意的事" android:textColor="#46536B" android:textSize="12sp" android:layout_marginBottom="10dp" />
-    <TextView android:id="@+id/widget_tasks" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:text="打开余时，安排今天要做的事" android:textColor="#18243C" android:textSize="16sp" android:textStyle="bold" android:lineSpacingExtra="7dp" android:ellipsize="end" />
-    <TextView android:id="@+id/widget_more" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="打开余时 →" android:textColor="#2F5CF3" android:textSize="12sp" android:paddingTop="8dp" />
+
+    <TextView
+        android:id="@+id/widget_progress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="0 件待办 · 0 件完成"
+        android:textColor="#46536B"
+        android:textSize="14sp" />
+
+    <LinearLayout
+        android:id="@+id/widget_task_list"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_task_1"
+            style="@style/WidgetTaskRow" />
+
+        <TextView
+            android:id="@+id/widget_task_2"
+            style="@style/WidgetTaskRow" />
+
+        <TextView
+            android:id="@+id/widget_task_3"
+            style="@style/WidgetTaskRow" />
+
+        <TextView
+            android:id="@+id/widget_task_4"
+            style="@style/WidgetTaskRow" />
+        <TextView android:id="@+id/widget_task_5" style="@style/WidgetTaskRow" android:visibility="gone" />
+        <TextView android:id="@+id/widget_task_6" style="@style/WidgetTaskRow" android:visibility="gone" />
+        <TextView android:id="@+id/widget_task_7" style="@style/WidgetTaskRow" android:visibility="gone" />
+        <TextView android:id="@+id/widget_task_8" style="@style/WidgetTaskRow" android:visibility="gone" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="top"
+        android:text="今天已完成"
+        android:textColor="#46536B"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 </LinearLayout>

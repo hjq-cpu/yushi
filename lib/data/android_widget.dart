@@ -5,6 +5,13 @@ import 'package:flutter/services.dart';
 class AndroidWidget {
   static const channel = MethodChannel('com.yushi.yushi/widget');
 
+  static void bindReload(Future<void> Function() reload) {
+    if (kIsWeb || !Platform.isAndroid) return;
+    channel.setMethodCallHandler((call) async {
+      if (call.method == 'reload') await reload();
+    });
+  }
+
   static Future<void> refresh() async {
     if (kIsWeb || !Platform.isAndroid) return;
     try {

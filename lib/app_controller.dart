@@ -1,11 +1,14 @@
 import 'package:flutter/foundation.dart';
 
 import 'data/local_repository.dart';
+import 'data/android_widget.dart';
 import 'domain/models.dart';
 import 'domain/planning.dart';
 
 class AppController extends ChangeNotifier {
-  AppController(this.repository);
+  AppController(this.repository) {
+    AndroidWidget.bindReload(reloadFromStorage);
+  }
 
   final LocalRepository repository;
   AppSnapshot snapshot = AppSnapshot.empty();
@@ -19,6 +22,17 @@ class AppController extends ChangeNotifier {
       error = '本地数据读取失败：$e';
     } finally {
       loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> reloadFromStorage() async {
+    try {
+      snapshot = await repository.load();
+      error = null;
+    } catch (e) {
+      error = '本地数据读取失败：$e';
+    } finally {
       notifyListeners();
     }
   }

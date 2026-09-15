@@ -8,10 +8,15 @@ import android.content.ComponentName
 import android.os.Build
 
 class MainActivity : FlutterActivity() {
+    private var widgetChannel: MethodChannel? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.yushi.yushi/widget")
-            .setMethodCallHandler { call, result ->
+        widgetChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.yushi.yushi/widget",
+        ).also { channel ->
+            channel.setMethodCallHandler { call, result ->
                 when (call.method) {
                     "refresh" -> {
                         TodayWidget.refresh(this)
@@ -25,10 +30,12 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        }
     }
 
     override fun onResume() {
         super.onResume()
         TodayWidget.refresh(this)
+        widgetChannel?.invokeMethod("reload", null)
     }
 }
