@@ -1,0 +1,7 @@
+<resources>
+    <color name="yushi_background">#11151D</color>
+    <color name="yushi_ink">#E8EDF6</color>
+    <color name="yushi_secondary">#B3BFD2</color>
+    <color name="yushi_accent">#91ADFF</color>
+    <color name="yushi_rule">#39465C</color>
+</resources>

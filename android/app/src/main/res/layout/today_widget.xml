@@ -17,7 +17,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="余时 · 待办"
-            android:textColor="#18243C"
+            android:textColor="@color/yushi_ink"
             android:textSize="20sp"
             android:textStyle="bold" />
 
@@ -28,7 +28,7 @@
             android:contentDescription="刷新待办事项"
             android:gravity="center"
             android:text="刷新"
-            android:textColor="#2F5CF3"
+            android:textColor="@color/yushi_accent"
             android:textSize="15sp" />
     </LinearLayout>
 
@@ -38,7 +38,7 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
         android:text="待办事项"
-        android:textColor="#46536B"
+        android:textColor="@color/yushi_secondary"
         android:textSize="14sp" />
 
     <LinearLayout
@@ -75,7 +75,7 @@
         android:layout_marginTop="12dp"
         android:gravity="top"
         android:text="暂无其他安排"
-        android:textColor="#46536B"
+        android:textColor="@color/yushi_secondary"
         android:textSize="18sp"
         android:textStyle="bold"
         android:visibility="gone" />

@@ -13,91 +13,118 @@ abstract final class YushiColors {
   static const danger = Color(0xFFB42318);
 }
 
-ThemeData buildYushiTheme() {
+class YushiPalette {
+  const YushiPalette(this.dark);
+  final bool dark;
+  Color get cobalt => dark ? const Color(0xFF91ADFF) : YushiColors.cobalt;
+  Color get ink => dark ? const Color(0xFFE8EDF6) : YushiColors.ink;
+  Color get secondary => dark ? const Color(0xFFB3BFD2) : YushiColors.secondary;
+  Color get background =>
+      dark ? const Color(0xFF11151D) : YushiColors.background;
+  Color get paper => dark ? const Color(0xFF1B2230) : YushiColors.paper;
+  Color get focus => dark ? const Color(0xFF293956) : YushiColors.focus;
+  Color get rule => dark ? const Color(0xFF39465C) : YushiColors.rule;
+  Color get success => dark ? const Color(0xFF7CD5B0) : YushiColors.success;
+  Color get danger => dark ? const Color(0xFFFFAAA2) : YushiColors.danger;
+}
+
+extension YushiContextColors on BuildContext {
+  YushiPalette get colors =>
+      YushiPalette(Theme.of(this).brightness == Brightness.dark);
+}
+
+ThemeData buildYushiTheme({Brightness brightness = Brightness.light}) {
+  final colors = YushiPalette(brightness == Brightness.dark);
   final scheme =
       ColorScheme.fromSeed(
-        seedColor: YushiColors.cobalt,
-        brightness: Brightness.light,
-        surface: YushiColors.paper,
+        seedColor: colors.cobalt,
+        brightness: brightness,
+        surface: colors.paper,
       ).copyWith(
-        primary: YushiColors.cobalt,
-        onPrimary: Colors.white,
-        surface: YushiColors.paper,
-        onSurface: YushiColors.ink,
-        outline: YushiColors.rule,
-        error: YushiColors.danger,
+        primary: colors.cobalt,
+        onPrimary: brightness == Brightness.dark
+            ? const Color(0xFF14213C)
+            : Colors.white,
+        surface: colors.paper,
+        onSurface: colors.ink,
+        outline: colors.rule,
+        error: colors.danger,
       );
   return ThemeData(
     useMaterial3: true,
+    brightness: brightness,
+    bottomSheetTheme: BottomSheetThemeData(backgroundColor: colors.paper),
     colorScheme: scheme,
-    scaffoldBackgroundColor: YushiColors.background,
-    appBarTheme: const AppBarTheme(
-      systemOverlayStyle: SystemUiOverlayStyle.dark,
+    scaffoldBackgroundColor: colors.background,
+    appBarTheme: AppBarTheme(
+      systemOverlayStyle: brightness == Brightness.dark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark,
     ),
-    textTheme: const TextTheme(
+    textTheme: TextTheme(
       headlineLarge: TextStyle(
-        color: YushiColors.ink,
+        color: colors.ink,
         fontSize: 36,
         height: 1.25,
         fontWeight: FontWeight.w700,
       ),
       headlineMedium: TextStyle(
-        color: YushiColors.ink,
+        color: colors.ink,
         fontSize: 27,
         height: 1.3,
         fontWeight: FontWeight.w700,
       ),
       titleLarge: TextStyle(
-        color: YushiColors.ink,
+        color: colors.ink,
         fontSize: 22,
         height: 1.35,
         fontWeight: FontWeight.w700,
       ),
       titleMedium: TextStyle(
-        color: YushiColors.ink,
+        color: colors.ink,
         fontSize: 18,
         height: 1.4,
         fontWeight: FontWeight.w600,
       ),
       bodyLarge: TextStyle(
-        color: YushiColors.ink,
+        color: colors.ink,
         fontSize: 17,
         height: 1.5,
         fontWeight: FontWeight.w600,
       ),
       bodyMedium: TextStyle(
-        color: YushiColors.secondary,
+        color: colors.secondary,
         fontSize: 15,
         height: 1.5,
         fontWeight: FontWeight.w500,
       ),
       bodySmall: TextStyle(
-        color: YushiColors.secondary,
+        color: colors.secondary,
         fontSize: 13,
         height: 1.4,
         fontWeight: FontWeight.w500,
       ),
       labelLarge: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
     ),
-    dividerColor: YushiColors.rule,
+    dividerColor: colors.rule,
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: YushiColors.paper,
-      hintStyle: const TextStyle(
-        color: YushiColors.secondary,
+      fillColor: colors.paper,
+      hintStyle: TextStyle(
+        color: colors.secondary,
         fontWeight: FontWeight.w500,
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: YushiColors.rule),
+        borderSide: BorderSide(color: colors.rule),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: YushiColors.rule),
+        borderSide: BorderSide(color: colors.rule),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: YushiColors.cobalt, width: 1.5),
+        borderSide: BorderSide(color: colors.cobalt, width: 1.5),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -116,8 +143,8 @@ ThemeData buildYushiTheme() {
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           color: states.contains(WidgetState.selected)
-              ? YushiColors.cobalt
-              : YushiColors.secondary,
+              ? colors.cobalt
+              : colors.secondary,
           fontSize: 13,
           fontWeight: states.contains(WidgetState.selected)
               ? FontWeight.w700

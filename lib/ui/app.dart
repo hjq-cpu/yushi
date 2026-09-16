@@ -28,6 +28,8 @@ class YushiApp extends StatelessWidget {
     title: '余时',
     debugShowCheckedModeBanner: false,
     theme: buildYushiTheme(),
+    darkTheme: buildYushiTheme(brightness: Brightness.dark),
+    themeMode: ThemeMode.system,
     home: HomeShell(controller: controller),
   );
 }
@@ -87,7 +89,7 @@ class _HomeShellState extends State<HomeShell> {
                 ),
               ),
               const SizedBox(width: 9),
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(bottom: 3),
                 child: Text(
                   'YU SHI',
@@ -95,7 +97,7 @@ class _HomeShellState extends State<HomeShell> {
                     fontFamily: null,
                     fontSize: 10,
                     letterSpacing: 1.6,
-                    color: YushiColors.secondary,
+                    color: context.colors.secondary,
                   ),
                 ),
               ),
@@ -129,21 +131,20 @@ class _HomeShellState extends State<HomeShell> {
             ),
             const SizedBox(width: 8),
           ],
-          bottom: const PreferredSize(
+          bottom: PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(
               height: 1,
               indent: 22,
               endIndent: 22,
-              color: YushiColors.ink,
+              color: context.colors.ink,
             ),
           ),
         ),
         body: SafeArea(top: false, child: pages[index]),
         bottomNavigationBar: NavigationBar(
           selectedIndex: index,
-          backgroundColor: YushiColors.paper,
-          indicatorColor: YushiColors.focus,
+          indicatorColor: context.colors.focus,
           onDestinationSelected: (value) => setState(() => index = value),
           destinations: const [
             NavigationDestination(
@@ -230,7 +231,7 @@ class _IntroductionDialogState extends State<_IntroductionDialog> {
           const Text('骑行、学习、陪伴和休息，都值得拥有时间。计划改变时，也允许自己调整。'),
           const SizedBox(height: 16),
           if (error != null)
-            Text(error!, style: const TextStyle(color: YushiColors.danger)),
+            Text(error!, style: TextStyle(color: context.colors.danger)),
         ],
       ),
       actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -352,9 +353,9 @@ class ProjectsScreen extends StatelessWidget {
               const TextSpan(text: '那些一直\n'),
               TextSpan(
                 text: '在意的事。',
-                style: Theme.of(
-                  context,
-                ).textTheme.headlineLarge?.copyWith(color: YushiColors.cobalt),
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  color: context.colors.cobalt,
+                ),
               ),
             ],
           ),
@@ -457,8 +458,8 @@ class _ProjectRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: YushiColors.rule)),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: context.colors.rule)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,7 +483,7 @@ class _ProjectRow extends StatelessWidget {
                 if (project.nextStep.isNotEmpty)
                   Text(
                     '接下来可以：${project.nextStep}',
-                    style: const TextStyle(color: YushiColors.cobalt),
+                    style: TextStyle(color: context.colors.cobalt),
                   ),
                 TextButton(
                   onPressed: () => _openProject(context, controller, project),
@@ -601,7 +602,10 @@ class _SharePlanScreenState extends State<SharePlanScreen> {
             Expanded(
               child: FilledButton.icon(
                 onPressed: busy ? null : share,
-                icon: const AppIcon(AppGlyph.share, color: Colors.white),
+                icon: AppIcon(
+                  AppGlyph.share,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                ),
                 label: const Text('分享'),
               ),
             ),
@@ -690,10 +694,15 @@ class PlanPoster extends StatelessWidget {
   final List<TaskItem> tasks;
   final bool includeTimes;
   @override
-  Widget build(BuildContext context) => Container(
-    decoration: const BoxDecoration(
+  Widget build(BuildContext context) => Theme(
+    data: buildYushiTheme(),
+    child: Builder(builder: buildPoster),
+  );
+
+  Widget buildPoster(BuildContext context) => Container(
+    decoration: BoxDecoration(
       color: Colors.white,
-      border: Border(top: BorderSide(color: YushiColors.cobalt, width: 6)),
+      border: Border(top: BorderSide(color: context.colors.cobalt, width: 6)),
     ),
     padding: const EdgeInsets.fromLTRB(26, 28, 26, 30),
     child: Column(
@@ -705,7 +714,7 @@ class PlanPoster extends StatelessWidget {
               'TO DO / 待办',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontSize: 13,
-                color: YushiColors.cobalt,
+                color: context.colors.cobalt,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1,
               ),
@@ -713,16 +722,16 @@ class PlanPoster extends StatelessWidget {
             const Spacer(),
             Text(
               '${tasks.length.toString().padLeft(2, '0')} 件事项',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: null,
                 fontSize: 10,
                 letterSpacing: 2,
-                color: YushiColors.secondary,
+                color: context.colors.secondary,
               ),
             ),
           ],
         ),
-        const Divider(height: 28, color: YushiColors.ink),
+        Divider(height: 28, color: context.colors.ink),
         Text('我的待办', style: Theme.of(context).textTheme.headlineMedium),
         Text(
           _fullDate(DateTime.now()),
@@ -737,8 +746,8 @@ class PlanPoster extends StatelessWidget {
           for (var i = 0; i < tasks.length; i++)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: YushiColors.rule)),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: context.colors.rule)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -747,9 +756,9 @@ class PlanPoster extends StatelessWidget {
                     width: 36,
                     child: Text(
                       (i + 1).toString().padLeft(2, '0'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: null,
-                        color: YushiColors.cobalt,
+                        color: context.colors.cobalt,
                         fontSize: 14,
                       ),
                     ),
@@ -803,7 +812,7 @@ class PlanPoster extends StatelessWidget {
           '在意的事，随时可以继续。',
           style: Theme.of(
             context,
-          ).textTheme.titleMedium?.copyWith(color: YushiColors.cobalt),
+          ).textTheme.titleMedium?.copyWith(color: context.colors.cobalt),
         ),
         const SizedBox(height: 28),
         const Divider(height: 1),
@@ -820,7 +829,7 @@ class PlanPoster extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -832,7 +841,7 @@ class PlanPoster extends StatelessWidget {
                     '把时间留给在意的事',
                     style: TextStyle(
                       fontSize: 10,
-                      color: YushiColors.secondary,
+                      color: context.colors.secondary,
                     ),
                   ),
                 ],
@@ -841,10 +850,10 @@ class PlanPoster extends StatelessWidget {
             Text(
               '${dateKey(DateTime.now())}\n${_time(DateTime.now().hour * 60 + DateTime.now().minute)} 生成',
               textAlign: TextAlign.right,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
                 height: 1.6,
-                color: YushiColors.secondary,
+                color: context.colors.secondary,
               ),
             ),
           ],
@@ -871,10 +880,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     body: ListView(
       padding: const EdgeInsets.all(22),
       children: [
+        const ListTile(
+          leading: Icon(Icons.brightness_auto_outlined),
+          title: Text('外观 · 跟随系统'),
+          subtitle: Text('随手机设置自动切换浅色和深色模式'),
+        ),
         if (Platform.isAndroid)
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const AppIcon(AppGlyph.today, color: YushiColors.cobalt),
+            leading: AppIcon(AppGlyph.today, color: context.colors.cobalt),
             title: const Text('添加待办小组件'),
             subtitle: const Text('在桌面查看待办；事项标题会显示在桌面上'),
             onTap: () async {
@@ -915,7 +929,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             margin: const EdgeInsets.only(top: 16),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: YushiColors.focus,
+              color: context.colors.focus,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -1031,7 +1045,7 @@ class _SettingsAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListTile(
     contentPadding: const EdgeInsets.symmetric(vertical: 5),
-    leading: AppIcon(icon, color: YushiColors.cobalt),
+    leading: AppIcon(icon, color: context.colors.cobalt),
     title: Text(title),
     subtitle: Text(subtitle),
     trailing: const AppIcon(AppGlyph.chevronRight),
@@ -1050,7 +1064,6 @@ Future<void> showTaskEditor(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: YushiColors.background,
     builder: (_) => TaskEditorSheet(
       controller: controller,
       initialDate: initialDate,
@@ -1134,7 +1147,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
               width: 38,
               height: 4,
               decoration: BoxDecoration(
-                color: YushiColors.rule,
+                color: context.colors.rule,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1350,7 +1363,6 @@ Future<void> _showTaskDetails(
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    backgroundColor: YushiColors.paper,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
@@ -1392,16 +1404,16 @@ Future<void> _showTaskDetails(
                       ),
                       decoration: BoxDecoration(
                         color: completed
-                            ? YushiColors.success.withValues(alpha: 0.08)
-                            : YushiColors.focus,
+                            ? context.colors.success.withValues(alpha: 0.08)
+                            : context.colors.focus,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         completed ? '已完成' : _phaseName(task),
                         style: TextStyle(
                           color: completed
-                              ? YushiColors.success
-                              : YushiColors.cobalt,
+                              ? context.colors.success
+                              : context.colors.cobalt,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -1428,7 +1440,7 @@ Future<void> _showTaskDetails(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: YushiColors.background,
+                    color: context.colors.background,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
@@ -1469,7 +1481,7 @@ Future<void> _showTaskDetails(
                     padding: const EdgeInsets.only(top: 12),
                     child: Text(
                       failure!,
-                      style: const TextStyle(color: YushiColors.danger),
+                      style: TextStyle(color: context.colors.danger),
                     ),
                   ),
                 TextButton(
@@ -1572,13 +1584,13 @@ Future<void> _showTaskDetails(
                             ? null
                             : () => perform(() => controller.archiveTask(task)),
                         style: TextButton.styleFrom(
-                          foregroundColor: YushiColors.secondary,
+                          foregroundColor: context.colors.secondary,
                         ),
                         icon: const AppIcon(AppGlyph.archive, size: 20),
                         label: const Text('归档'),
                       ),
                     ),
-                    Container(height: 18, width: 1, color: YushiColors.rule),
+                    Container(height: 18, width: 1, color: context.colors.rule),
                     Expanded(
                       child: TextButton.icon(
                         onPressed: busy
@@ -1593,11 +1605,11 @@ Future<void> _showTaskDetails(
                                 );
                               },
                         style: TextButton.styleFrom(
-                          foregroundColor: YushiColors.danger,
+                          foregroundColor: context.colors.danger,
                         ),
-                        icon: const AppIcon(
+                        icon: AppIcon(
                           AppGlyph.delete,
-                          color: YushiColors.danger,
+                          color: context.colors.danger,
                         ),
                         label: const Text('永久删除'),
                       ),
@@ -1744,7 +1756,7 @@ Future<void> _confirmDeleteProject(
         ),
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext, true),
-          style: FilledButton.styleFrom(backgroundColor: YushiColors.danger),
+          style: FilledButton.styleFrom(backgroundColor: context.colors.danger),
           child: const Text('永久删除'),
         ),
       ],
@@ -1802,7 +1814,7 @@ Future<void> _confirmDeleteTask(
         ),
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext, true),
-          style: FilledButton.styleFrom(backgroundColor: YushiColors.danger),
+          style: FilledButton.styleFrom(backgroundColor: context.colors.danger),
           child: const Text('永久删除'),
         ),
       ],

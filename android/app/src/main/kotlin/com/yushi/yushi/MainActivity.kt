@@ -33,6 +33,11 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        TodayWidget.refresh(this)
+    }
+
     override fun onResume() {
         super.onResume()
         TodayWidget.refresh(this)

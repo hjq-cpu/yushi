@@ -31,8 +31,8 @@ class TaskLine extends StatelessWidget {
             ? Icons.check_circle
             : Icons.radio_button_unchecked,
         color: task.phase == TaskPhase.doing
-            ? YushiColors.cobalt
-            : YushiColors.secondary,
+            ? context.colors.cobalt
+            : context.colors.secondary,
       ),
       onPressed: () async {
         try {
@@ -155,7 +155,7 @@ class _NowScreenState extends State<NowScreen> {
         if (controller.error != null)
           Text(
             controller.error!,
-            style: const TextStyle(color: YushiColors.danger),
+            style: TextStyle(color: context.colors.danger),
           ),
       ],
     );
