@@ -224,13 +224,12 @@ open class TodayWidget : AppWidgetProvider() {
             }
             views.setTextViewText(
                 R.id.widget_progress,
-                if (compact) "${pending.size} 待办 · ${tasks.count(completed)} 完成"
-                else "${pending.size} 件待办 · ${tasks.count(completed)} 件完成",
+                "今天的安排",
             )
             views.setViewVisibility(R.id.widget_task_list, if (pending.isEmpty()) View.GONE else View.VISIBLE)
             views.setViewVisibility(R.id.widget_progress, if (tasks.isEmpty()) View.GONE else View.VISIBLE)
             views.setViewVisibility(R.id.widget_empty, if (pending.isEmpty()) View.VISIBLE else View.GONE)
-            views.setTextViewText(R.id.widget_empty, if (tasks.isEmpty()) "暂无安排" else "今天已完成")
+            views.setTextViewText(R.id.widget_empty, if (tasks.isEmpty()) "暂无安排" else "暂无其他安排")
             taskViewIds.forEachIndexed { index, viewId ->
                 val task = if (index < rowCount) pending.getOrNull(index) else null
                 views.setViewVisibility(viewId, if (task == null) View.GONE else View.VISIBLE)
@@ -241,7 +240,7 @@ open class TodayWidget : AppWidgetProvider() {
                     val title = task.optString("title").replace('\n', ' ')
                     views.setTextViewText(
                         viewId,
-                        "${if (task.optBoolean("isFocus")) "★" else "○"}  $time$title",
+                        "○  $time$title",
                     )
                     views.setContentDescription(viewId, "完成$title")
                     views.setOnClickPendingIntent(

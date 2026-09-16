@@ -47,6 +47,7 @@ class AppController extends ChangeNotifier {
     final item = TaskItem(
       id: _id('task'),
       title: title.trim(),
+      estimateMins: 0,
       createdAt: now,
       updatedAt: now,
     );
@@ -55,11 +56,11 @@ class AppController extends ChangeNotifier {
 
   Future<void> addTask({
     required String title,
-    required DateTime plannedDate,
+    DateTime? plannedDate,
     String note = '',
     String? projectId,
     int? timeMinutes,
-    int estimateMins = 25,
+    int estimateMins = 0,
     bool isFocus = false,
     bool isPrivate = false,
     DateTime? deadline,
@@ -67,7 +68,7 @@ class AppController extends ChangeNotifier {
   }) async {
     final now = DateTime.now();
     var tasks = snapshot.tasks;
-    if (isFocus) {
+    if (isFocus && plannedDate != null) {
       tasks = tasks
           .map(
             (task) =>
@@ -83,14 +84,14 @@ class AppController extends ChangeNotifier {
       title: title.trim(),
       note: note.trim(),
       projectId: projectId,
-      status: TaskStatus.planned,
-      plannedDate: dateOnly(plannedDate),
+      status: plannedDate == null ? TaskStatus.inbox : TaskStatus.planned,
+      plannedDate: plannedDate == null ? null : dateOnly(plannedDate),
       deadline: deadline == null ? null : dateOnly(deadline),
-      timeMinutes: timeMinutes,
+      timeMinutes: plannedDate == null ? null : timeMinutes,
       estimateMins: estimateMins,
-      isFocus: isFocus,
+      isFocus: plannedDate != null && isFocus,
       isPrivate: isPrivate,
-      recurrence: recurrence,
+      recurrence: plannedDate == null ? const RecurrenceRule() : recurrence,
       createdAt: now,
       updatedAt: now,
     );
@@ -100,6 +101,16 @@ class AppController extends ChangeNotifier {
   Future<void> toggleComplete(TaskItem task, DateTime day) async {
     final id = '${task.id}@${dateKey(day)}';
     final entries = [...snapshot.completions];
+    if (task.recurrence.type == RecurrenceType.none && completed(task, day)) {
+      entries.removeWhere(
+        (entry) =>
+            entry.taskId == task.id &&
+            entry.status == CompletionStatus.completed &&
+            !dateOnly(entry.date).isAfter(dateOnly(day)),
+      );
+      await _commit(snapshot.copyWith(completions: entries));
+      return;
+    }
     final index = entries.indexWhere((entry) => entry.id == id);
     if (index >= 0 && entries[index].status == CompletionStatus.completed) {
       entries.removeAt(index);
@@ -148,6 +159,25 @@ class AppController extends ChangeNotifier {
     await _commit(snapshot.copyWith(tasks: tasks));
   }
 
+  Future<void> unschedule(TaskItem task) => _commit(
+    snapshot.copyWith(
+      tasks: snapshot.tasks
+          .map(
+            (item) => item.id == task.id
+                ? item.copyWith(
+                    status: TaskStatus.inbox,
+                    plannedDate: null,
+                    timeMinutes: null,
+                    isFocus: false,
+                    recurrence: const RecurrenceRule(),
+                    updatedAt: DateTime.now(),
+                  )
+                : item,
+          )
+          .toList(),
+    ),
+  );
+
   Future<void> restoreTask(TaskItem task) async {
     final tasks = snapshot.tasks
         .map(
@@ -192,6 +222,36 @@ class AppController extends ChangeNotifier {
         .map((item) => item.id == project.id ? project : item)
         .toList();
     await _commit(snapshot.copyWith(projects: projects));
+  }
+
+  Future<void> leaveProgress(
+    String projectId,
+    String text,
+    String nextStep,
+  ) async {
+    final project = snapshot.projects.firstWhere((p) => p.id == projectId);
+    final now = DateTime.now();
+    final entries = [...project.progress];
+    // Preserve context from versions before the progress journal existed.
+    if (entries.isEmpty && project.lastProgress.isNotEmpty) {
+      entries.add(
+        ProjectProgress(
+          text: project.lastProgress,
+          createdAt: project.updatedAt,
+        ),
+      );
+    }
+    if (text.trim().isNotEmpty) {
+      entries.add(ProjectProgress(text: text.trim(), createdAt: now));
+    }
+    await updateProject(
+      project.copyWith(
+        lastProgress: text.trim().isEmpty ? project.lastProgress : text.trim(),
+        nextStep: nextStep.trim(),
+        progress: entries,
+        updatedAt: now,
+      ),
+    );
   }
 
   Future<void> deleteProject(ProjectItem project) async {

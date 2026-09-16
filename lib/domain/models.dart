@@ -176,12 +176,30 @@ class TaskItem {
   );
 }
 
+class ProjectProgress {
+  const ProjectProgress({required this.text, required this.createdAt});
+  final String text;
+  final DateTime createdAt;
+  Map<String, dynamic> toJson() => {
+    'text': text,
+    'createdAt': createdAt.toIso8601String(),
+  };
+  factory ProjectProgress.fromJson(Map<String, dynamic> json) =>
+      ProjectProgress(
+        text: _string(json, 'text', nonEmpty: true),
+        createdAt: _timestamp(json, 'createdAt'),
+      );
+}
+
 class ProjectItem {
   const ProjectItem({
     required this.id,
     required this.title,
     this.reason = '',
     this.weekGoal = '',
+    this.lastProgress = '',
+    this.nextStep = '',
+    this.progress = const [],
     this.status = ProjectStatus.active,
     required this.createdAt,
     required this.updatedAt,
@@ -191,6 +209,9 @@ class ProjectItem {
   final String title;
   final String reason;
   final String weekGoal;
+  final String lastProgress;
+  final String nextStep;
+  final List<ProjectProgress> progress;
   final ProjectStatus status;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -200,6 +221,9 @@ class ProjectItem {
     String? title,
     String? reason,
     String? weekGoal,
+    String? lastProgress,
+    String? nextStep,
+    List<ProjectProgress>? progress,
     ProjectStatus? status,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -208,6 +232,9 @@ class ProjectItem {
     title: title ?? this.title,
     reason: reason ?? this.reason,
     weekGoal: weekGoal ?? this.weekGoal,
+    lastProgress: lastProgress ?? this.lastProgress,
+    nextStep: nextStep ?? this.nextStep,
+    progress: List.unmodifiable(progress ?? this.progress),
     status: status ?? this.status,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -218,6 +245,9 @@ class ProjectItem {
     'title': title,
     'reason': reason,
     'weekGoal': weekGoal,
+    'lastProgress': lastProgress,
+    'nextStep': nextStep,
+    'progress': progress.map((entry) => entry.toJson()).toList(),
     'status': status.name,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
@@ -228,6 +258,18 @@ class ProjectItem {
     title: _string(json, 'title', nonEmpty: true),
     reason: _string(json, 'reason'),
     weekGoal: _string(json, 'weekGoal'),
+    lastProgress: json.containsKey('lastProgress')
+        ? _string(json, 'lastProgress')
+        : '',
+    nextStep: json.containsKey('nextStep') ? _string(json, 'nextStep') : '',
+    progress: json.containsKey('progress')
+        ? List.unmodifiable(
+            _list(
+              json,
+              'progress',
+            ).map((entry) => ProjectProgress.fromJson(_object(entry))),
+          )
+        : const [],
     status: _enumValue(json, 'status', ProjectStatus.values),
     createdAt: _timestamp(json, 'createdAt'),
     updatedAt: _timestamp(json, 'updatedAt'),

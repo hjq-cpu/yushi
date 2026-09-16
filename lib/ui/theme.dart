@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 abstract final class YushiColors {
   static const cobalt = Color(0xFF2F5CF3);
@@ -30,6 +31,9 @@ ThemeData buildYushiTheme() {
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: YushiColors.background,
+    appBarTheme: const AppBarTheme(
+      systemOverlayStyle: SystemUiOverlayStyle.dark,
+    ),
     textTheme: const TextTheme(
       headlineLarge: TextStyle(
         color: YushiColors.ink,

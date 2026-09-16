@@ -18,6 +18,8 @@ import '../domain/planning.dart';
 import 'app_icons.dart';
 import 'theme.dart';
 
+part 'spaces.dart';
+
 class YushiApp extends StatelessWidget {
   const YushiApp({super.key, required this.controller});
   final AppController controller;
@@ -66,9 +68,9 @@ class _HomeShellState extends State<HomeShell> {
       }
       scheduleIntroduction();
       final pages = [
-        TodayScreen(controller: widget.controller),
-        WeekScreen(controller: widget.controller),
+        NowScreen(controller: widget.controller),
         ProjectsScreen(controller: widget.controller),
+        FootprintsScreen(controller: widget.controller),
       ];
       return Scaffold(
         appBar: AppBar(
@@ -102,15 +104,10 @@ class _HomeShellState extends State<HomeShell> {
             ],
           ),
           actions: [
-            TextButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      SharePlanScreen(controller: widget.controller),
-                ),
-              ),
-              icon: const AppIcon(AppGlyph.image, size: 19),
-              label: const Text('分享今天'),
+            IconButton(
+              tooltip: '有日期的事',
+              icon: const AppIcon(AppGlyph.calendar),
+              onPressed: () => _openDates(context, widget.controller),
             ),
             IconButton(
               tooltip: '设置与数据',
@@ -140,12 +137,12 @@ class _HomeShellState extends State<HomeShell> {
           indicatorColor: YushiColors.focus,
           onDestinationSelected: (value) => setState(() => index = value),
           destinations: const [
-            NavigationDestination(icon: AppIcon(AppGlyph.today), label: '今天'),
-            NavigationDestination(icon: AppIcon(AppGlyph.week), label: '节奏'),
+            NavigationDestination(icon: AppIcon(AppGlyph.today), label: '此刻'),
             NavigationDestination(
               icon: AppIcon(AppGlyph.projects),
-              label: '项目',
+              label: '在意',
             ),
+            NavigationDestination(icon: AppIcon(AppGlyph.book), label: '足迹'),
           ],
         ),
       );
@@ -210,15 +207,15 @@ class _IntroductionDialogState extends State<_IntroductionDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('工作之外，你还有想做的项目、想学的东西，以及需要照顾的生活。余时帮助你从这些事情里，选出今天值得投入的一步。'),
+          const Text('这里可以装下想法、在意的方向和发生过的点滴。记下来，就已经有了一个可以回来的地方。'),
           const SizedBox(height: 18),
-          const Text('有所选择', style: TextStyle(fontWeight: FontWeight.w700)),
-          const Text('今天先推进一件重要的事，让具体行动有一个起点。'),
+          const Text('随手记下', style: TextStyle(fontWeight: FontWeight.w700)),
+          const Text('想到就记下，不必同时承诺日期、时长或完成标准。'),
           const SizedBox(height: 12),
-          const Text('适可而止', style: TextStyle(fontWeight: FontWeight.w700)),
-          const Text('写下做到哪里就够了。完成之后，也可以安心停下。'),
+          const Text('保留线索', style: TextStyle(fontWeight: FontWeight.w700)),
+          const Text('留下一点过程或线索，下次打开项目就能接着做。'),
           const SizedBox(height: 12),
-          const Text('允许留白', style: TextStyle(fontWeight: FontWeight.w700)),
+          const Text('自由安排', style: TextStyle(fontWeight: FontWeight.w700)),
           const Text('骑行、学习、陪伴和休息，都值得拥有时间。计划改变时，也允许自己调整。'),
           const SizedBox(height: 16),
           if (error != null)
@@ -268,361 +265,6 @@ class _IntroductionDialogState extends State<_IntroductionDialog> {
   );
 }
 
-class TodayScreen extends StatelessWidget {
-  const TodayScreen({super.key, required this.controller});
-  final AppController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final today = dateOnly(DateTime.now());
-    final tasks = controller.forDay(today);
-    final focus = controller.focusForDay(today);
-    final others = tasks.where((task) => task.id != focus?.id).toList();
-    final pending = tasks
-        .where((task) => !controller.completed(task, today))
-        .length;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(22, 20, 22, 34),
-      children: [
-        Row(
-          children: [
-            Text(
-              _fullDate(today),
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(letterSpacing: .7),
-            ),
-            const Spacer(),
-            Text(
-              '今日 / ${pending.toString().padLeft(2, '0')}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        Text.rich(
-          TextSpan(
-            children: [
-              const TextSpan(text: '把时间留给\n'),
-              TextSpan(
-                text: '在意的事。',
-                style: Theme.of(
-                  context,
-                ).textTheme.headlineLarge?.copyWith(color: YushiColors.cobalt),
-              ),
-            ],
-          ),
-          style: Theme.of(context).textTheme.headlineLarge,
-        ),
-        const SizedBox(height: 22),
-        if (focus != null)
-          FocusCard(
-            task: focus,
-            completed: controller.completed(focus, today),
-            project: _projectName(controller.snapshot, focus),
-            onComplete: () =>
-                _run(context, () => controller.toggleComplete(focus, today)),
-            onAdjust: () => _showAdjust(context, controller, focus, today),
-          )
-        else
-          EmptyFocusCard(
-            onAdd: () => showTaskEditor(
-              context,
-              controller,
-              initialDate: today,
-              focus: true,
-            ),
-          ),
-        if (others.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Text('今天还安排了', style: Theme.of(context).textTheme.titleMedium),
-              const Spacer(),
-              Text(
-                '${others.length} 件',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ...others.map(
-            (task) => TaskLine(
-              task: task,
-              project: _projectName(controller.snapshot, task),
-              completed: controller.completed(task, today),
-              onTap: () => _showTaskDetails(context, controller, task, today),
-              onComplete: () =>
-                  _run(context, () => controller.toggleComplete(task, today)),
-            ),
-          ),
-        ],
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: () =>
-              showTaskEditor(context, controller, initialDate: today),
-          icon: const AppIcon(AppGlyph.add, size: 20),
-          label: const Text('添加今天要做的事'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-            side: const BorderSide(color: YushiColors.rule),
-          ),
-        ),
-        const SizedBox(height: 10),
-        QuickCapture(controller: controller),
-        if (controller.error != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Text(
-              controller.error!,
-              style: const TextStyle(color: YushiColors.danger),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class FocusCard extends StatelessWidget {
-  const FocusCard({
-    super.key,
-    required this.task,
-    required this.completed,
-    required this.project,
-    required this.onComplete,
-    required this.onAdjust,
-  });
-  final TaskItem task;
-  final bool completed;
-  final String project;
-  final VoidCallback onComplete;
-  final VoidCallback onAdjust;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(20, 20, 20, 13),
-    decoration: const BoxDecoration(
-      color: YushiColors.focus,
-      border: Border.fromBorderSide(BorderSide(color: YushiColors.rule)),
-      borderRadius: BorderRadius.only(
-        topLeft: Radius.circular(5),
-        topRight: Radius.circular(24),
-        bottomLeft: Radius.circular(5),
-        bottomRight: Radius.circular(5),
-      ),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              completed ? '✓' : '01',
-              style: const TextStyle(
-                fontFamily: null,
-                fontSize: 25,
-                color: YushiColors.cobalt,
-              ),
-            ),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Text(
-                completed ? '已经完成 · $project' : '本周选定 · $project',
-                style: const TextStyle(
-                  fontFamily: null,
-                  fontSize: 12,
-                  letterSpacing: .5,
-                  color: YushiColors.cobalt,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Text(
-          completed ? '这一份，已经完成。' : task.title,
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 7),
-        Text(
-          completed
-              ? '今天的重点可以在这里收尾。'
-              : (task.note.isEmpty ? '完成这一个具体步骤，就可以收尾。' : task.note),
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        if (!completed) ...[
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              const AppIcon(
-                AppGlyph.clock,
-                size: 17,
-                color: YushiColors.secondary,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '约 ${task.estimateMins} 分钟 · 一次具体的推进',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ],
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: onComplete,
-          icon: AppIcon(
-            completed ? AppGlyph.restore : AppGlyph.check,
-            size: 19,
-            color: Colors.white,
-          ),
-          label: Text(completed ? '恢复为待办' : '完成这一步'),
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-        ),
-        TextButton(
-          onPressed: onAdjust,
-          child: Text(completed ? '留下下一步' : '调整今天'),
-        ),
-      ],
-    ),
-  );
-}
-
-class EmptyFocusCard extends StatelessWidget {
-  const EmptyFocusCard({super.key, required this.onAdd});
-  final VoidCallback onAdd;
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: YushiColors.focus,
-      border: Border.all(color: YushiColors.rule),
-      borderRadius: const BorderRadius.only(
-        topRight: Radius.circular(24),
-        topLeft: Radius.circular(5),
-        bottomLeft: Radius.circular(5),
-        bottomRight: Radius.circular(5),
-      ),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          '今天留白',
-          style: TextStyle(
-            fontFamily: null,
-            fontSize: 12,
-            letterSpacing: .5,
-            color: YushiColors.cobalt,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text('还没有选定重点。', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 7),
-        Text(
-          '可以保留空白，也可以选择一件真正值得推进的事。',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: onAdd,
-          icon: const AppIcon(AppGlyph.target, color: Colors.white),
-          label: const Text('选一件重点'),
-        ),
-      ],
-    ),
-  );
-}
-
-class TaskLine extends StatelessWidget {
-  const TaskLine({
-    super.key,
-    required this.task,
-    required this.project,
-    required this.completed,
-    required this.onTap,
-    required this.onComplete,
-  });
-  final TaskItem task;
-  final String project;
-  final bool completed;
-  final VoidCallback onTap;
-  final VoidCallback onComplete;
-
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: const BoxDecoration(
-      border: Border(bottom: BorderSide(color: YushiColors.rule)),
-    ),
-    child: Row(
-      children: [
-        IconButton(
-          tooltip: completed ? '恢复待办' : '完成',
-          onPressed: onComplete,
-          icon: completed
-              ? const CircleAvatar(
-                  radius: 11,
-                  backgroundColor: YushiColors.cobalt,
-                  child: AppIcon(AppGlyph.check, size: 15, color: Colors.white),
-                )
-              : Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: YushiColors.secondary),
-                  ),
-                ),
-        ),
-        Expanded(
-          child: InkWell(
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          task.title,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                decoration: completed
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                                color: completed
-                                    ? YushiColors.secondary
-                                    : YushiColors.ink,
-                              ),
-                        ),
-                      ),
-                      if (task.timeMinutes != null)
-                        Text(
-                          _time(task.timeMinutes!),
-                          style: const TextStyle(
-                            fontFamily: null,
-                            color: YushiColors.cobalt,
-                            fontSize: 13,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$project · 约 ${task.estimateMins} 分钟${task.deadline != null ? ' · 截止 ${_monthDay(task.deadline!)}' : ''}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 class QuickCapture extends StatefulWidget {
   const QuickCapture({super.key, required this.controller});
   final AppController controller;
@@ -657,640 +299,20 @@ class _QuickCaptureState extends State<QuickCapture> {
     ),
   );
   Future<void> submit() async {
+    if (busy) return;
     final value = text.text.trim();
     if (value.isEmpty) return;
     setState(() => busy = true);
     try {
       await widget.controller.addInbox(value);
       text.clear();
-      if (mounted) _snack(context, '已放入收集箱，安排可以以后再说');
+      if (mounted) _snack(context, '已记下');
+    } catch (e) {
+      if (mounted) _snack(context, '记录失败：$e');
     } finally {
       if (mounted) setState(() => busy = false);
     }
   }
-}
-
-class WeekScreen extends StatefulWidget {
-  const WeekScreen({super.key, required this.controller});
-  final AppController controller;
-
-  @override
-  State<WeekScreen> createState() => _WeekScreenState();
-}
-
-class _WeekScreenState extends State<WeekScreen> {
-  DateTime _anchor = dateOnly(DateTime.now());
-  bool _monthly = false;
-
-  AppController get controller => widget.controller;
-
-  void _move(int direction) => setState(() {
-    _anchor = _monthly
-        ? DateTime(_anchor.year, _anchor.month + direction)
-        : DateTime(_anchor.year, _anchor.month, _anchor.day + direction * 7);
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final today = dateOnly(DateTime.now());
-    final start = _monthly
-        ? DateTime(_anchor.year, _anchor.month)
-        : weekStart(
-            _anchor,
-            startsOn: controller.snapshot.settings.weekStartsOn,
-          );
-    final dayCount = _monthly
-        ? DateTime(start.year, start.month + 1, 0).day
-        : 7;
-    final end = DateTime(start.year, start.month, start.day + dayCount);
-    final isCurrent = !today.isBefore(start) && today.isBefore(end);
-    final period = _monthly ? '月' : '周';
-    final label = isCurrent ? '本$period' : '此$period';
-    return ListView(
-      key: ValueKey('${dateKey(start)}-$_monthly'),
-      padding: const EdgeInsets.fromLTRB(22, 20, 22, 34),
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${start.year} · 时间与生活',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final monthly in [false, true])
-                      Semantics(
-                        selected: _monthly == monthly,
-                        button: true,
-                        child: InkWell(
-                          onTap: () => setState(() => _monthly = monthly),
-                          borderRadius: BorderRadius.circular(8),
-                          child: SizedBox(
-                            width: 44,
-                            height: 44,
-                            child: Center(
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 150),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _monthly == monthly
-                                      ? YushiColors.focus
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  monthly ? '月' : '周',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: _monthly == monthly
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    color: _monthly == monthly
-                                        ? YushiColors.cobalt
-                                        : YushiColors.secondary,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text.rich(
-              TextSpan(
-                children: [
-                  const TextSpan(text: '有安排，\n'),
-                  const TextSpan(
-                    text: '也有余地。',
-                    style: TextStyle(color: YushiColors.cobalt),
-                  ),
-                ],
-              ),
-              style: Theme.of(context).textTheme.headlineLarge,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '先看真实可用的时间，再决定把这一$period交给什么。',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                IconButton(
-                  tooltip: '上一$period',
-                  onPressed: () => _move(-1),
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                Expanded(
-                  child: Text(
-                    _monthly
-                        ? '${start.year} 年 ${start.month} 月'
-                        : '${start.month}.${start.day} — ${DateTime(start.year, start.month, start.day + 6).month}.${DateTime(start.year, start.month, start.day + 6).day}',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-                IconButton(
-                  tooltip: '下一$period',
-                  onPressed: () => _move(1),
-                  icon: const Icon(Icons.chevron_right),
-                ),
-                TextButton(
-                  onPressed: isCurrent
-                      ? null
-                      : () => setState(() => _anchor = today),
-                  child: Text('本$period'),
-                ),
-              ],
-            ),
-            if (_monthly) ...[
-              const SizedBox(height: 8),
-              _MonthCalendar(
-                month: start,
-                selected: _anchor,
-                controller: controller,
-                onSelected: (day) => setState(() => _anchor = day),
-              ),
-            ],
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                if (!_monthly)
-                  TextButton.icon(
-                    onPressed: () => _showWeekAnalysis(
-                      context,
-                      controller,
-                      start,
-                      isCurrent: isCurrent,
-                    ),
-                    icon: const AppIcon(AppGlyph.insights, size: 20),
-                    label: Text(isCurrent ? '分析本周' : '分析此周'),
-                  ),
-                FilledButton.tonalIcon(
-                  onPressed: () => showTaskEditor(
-                    context,
-                    controller,
-                    initialDate: _monthly
-                        ? _anchor
-                        : (isCurrent ? today : start),
-                  ),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(44, 44),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    backgroundColor: YushiColors.focus,
-                    foregroundColor: YushiColors.cobalt,
-                  ),
-                  icon: const AppIcon(AppGlyph.add, size: 20),
-                  label: Text('添加$label事项'),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        if (_monthly) ...[
-          Text(
-            _fullDate(_anchor),
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          _DaySection(
-            day: _anchor,
-            tasks: controller.forDay(_anchor),
-            controller: controller,
-          ),
-        ] else
-          for (var i = 0; i < dayCount; i++)
-            _DaySection(
-              day: DateTime(start.year, start.month, start.day + i),
-              tasks: controller.forDay(
-                DateTime(start.year, start.month, start.day + i),
-              ),
-              controller: controller,
-            ),
-        const SizedBox(height: 16),
-        Text(
-          '空白，也是计划的一部分。',
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(color: YushiColors.cobalt),
-        ),
-      ],
-    );
-  }
-}
-
-class _MonthCalendar extends StatelessWidget {
-  const _MonthCalendar({
-    required this.month,
-    required this.selected,
-    required this.controller,
-    required this.onSelected,
-  });
-
-  final DateTime month;
-  final DateTime selected;
-  final AppController controller;
-  final ValueChanged<DateTime> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final startsOn = controller.snapshot.settings.weekStartsOn;
-    final offset = (month.weekday - startsOn + 7) % 7;
-    final days = DateTime(month.year, month.month + 1, 0).day;
-    final rows = (offset + days + 6) ~/ 7;
-    final today = dateOnly(DateTime.now());
-    return Column(
-      children: [
-        Row(
-          children: List.generate(
-            7,
-            (column) => Expanded(
-              child: Center(
-                child: Text(
-                  const [
-                    '一',
-                    '二',
-                    '三',
-                    '四',
-                    '五',
-                    '六',
-                    '日',
-                  ][(startsOn - 1 + column) % 7],
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        for (var row = 0; row < rows; row++)
-          Row(
-            children: List.generate(7, (column) {
-              final number = row * 7 + column - offset + 1;
-              if (number < 1 || number > days) {
-                return const Expanded(child: SizedBox(height: 56));
-              }
-              final day = DateTime(month.year, month.month, number);
-              final tasks = controller.forDay(day);
-              final chosen = isSameDay(day, selected);
-              final isToday = isSameDay(day, today);
-              final allDone =
-                  tasks.isNotEmpty &&
-                  tasks.every((task) => controller.completed(task, day));
-              return Expanded(
-                child: Semantics(
-                  selected: chosen,
-                  button: true,
-                  label:
-                      '${_fullDate(day)}，${tasks.length} 项安排${isToday ? '，今天' : ''}',
-                  child: InkWell(
-                    key: ValueKey('calendar-${dateKey(day)}'),
-                    onTap: () => onSelected(day),
-                    borderRadius: BorderRadius.circular(10),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      constraints: const BoxConstraints(minHeight: 56),
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      decoration: BoxDecoration(
-                        color: chosen ? YushiColors.cobalt : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
-                        border: isToday && !chosen
-                            ? Border.all(color: YushiColors.cobalt)
-                            : null,
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            '$number',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: chosen || isToday
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: chosen ? Colors.white : YushiColors.ink,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            tasks.isEmpty ? '' : '${tasks.length}项',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: chosen
-                                  ? Colors.white
-                                  : (allDone
-                                        ? YushiColors.success
-                                        : YushiColors.cobalt),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-      ],
-    );
-  }
-}
-
-class _WeekAnalysis {
-  const _WeekAnalysis({
-    required this.scheduled,
-    required this.completed,
-    required this.blankDays,
-    this.bestDay,
-    this.bestDayCompleted = 0,
-  });
-
-  final int scheduled;
-  final int completed;
-  final int blankDays;
-  final DateTime? bestDay;
-  final int bestDayCompleted;
-
-  int get completionRate =>
-      scheduled == 0 ? 0 : (completed * 100 / scheduled).round();
-}
-
-_WeekAnalysis _analyzeWeek(AppController controller, DateTime start) {
-  var scheduled = 0;
-  var completed = 0;
-  var blankDays = 0;
-  DateTime? bestDay;
-  var bestDayCompleted = 0;
-  for (var i = 0; i < 7; i++) {
-    final day = DateTime(start.year, start.month, start.day + i);
-    final taskIds = controller.forDay(day).map((task) => task.id).toSet();
-    final completedIds = controller.snapshot.completions
-        .where(
-          (entry) =>
-              isSameDay(entry.date, day) &&
-              entry.status == CompletionStatus.completed,
-        )
-        .map((entry) => entry.taskId)
-        .toSet();
-    taskIds.addAll(completedIds);
-    scheduled += taskIds.length;
-    completed += completedIds.length;
-    if (taskIds.isEmpty) blankDays++;
-    if (completedIds.length > bestDayCompleted) {
-      bestDay = day;
-      bestDayCompleted = completedIds.length;
-    }
-  }
-  return _WeekAnalysis(
-    scheduled: scheduled,
-    completed: completed,
-    blankDays: blankDays,
-    bestDay: bestDay,
-    bestDayCompleted: bestDayCompleted,
-  );
-}
-
-Future<void> _showWeekAnalysis(
-  BuildContext context,
-  AppController controller,
-  DateTime start, {
-  required bool isCurrent,
-}) async {
-  final analysis = _analyzeWeek(controller, start);
-  final end = DateTime(start.year, start.month, start.day + 6);
-  await showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: YushiColors.background,
-    isScrollControlled: true,
-    builder: (sheetContext) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 22, 22, 26),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isCurrent ? '本周分析' : '此周分析',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${_monthDay(start)} — ${_monthDay(end)}',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: _AnalysisMetric(
-                    value: '${analysis.scheduled}',
-                    label: '安排次数',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _AnalysisMetric(
-                    value: '${analysis.completed}',
-                    label: '完成次数',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _AnalysisMetric(
-                    value: '${analysis.completionRate}%',
-                    label: '完成率',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const AppIcon(AppGlyph.insights),
-              title: const Text('完成最多的一天'),
-              subtitle: Text(
-                analysis.bestDay == null
-                    ? '还没有完成记录'
-                    : '${_fullDate(analysis.bestDay!)} · 完成 ${analysis.bestDayCompleted} 项',
-              ),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const AppIcon(AppGlyph.calendar),
-              title: Text('留白 ${analysis.blankDays} 天'),
-              subtitle: const Text('没有安排的日子，也算在这一周里'),
-            ),
-            if (analysis.scheduled == 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  '这一周还没有安排，可以先留白，也可以从一件小事开始。',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class _AnalysisMetric extends StatelessWidget {
-  const _AnalysisMetric({required this.value, required this.label});
-
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-    decoration: BoxDecoration(
-      color: YushiColors.paper,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: YushiColors.rule),
-    ),
-    child: Column(
-      children: [
-        Text(
-          value,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(color: YushiColors.cobalt),
-        ),
-        const SizedBox(height: 3),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    ),
-  );
-}
-
-class _DaySection extends StatelessWidget {
-  const _DaySection({
-    required this.day,
-    required this.tasks,
-    required this.controller,
-  });
-  final DateTime day;
-  final List<TaskItem> tasks;
-  final AppController controller;
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: () => showTaskEditor(context, controller, initialDate: day),
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 15),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: YushiColors.rule)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 48,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _weekdayShort(day),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: isSameDay(day, DateTime.now())
-                        ? YushiColors.cobalt
-                        : YushiColors.ink,
-                  ),
-                ),
-                Text(
-                  '${day.day}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: tasks.isEmpty
-                ? Text(
-                    '留白 · 点击添加',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (final task in tasks)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 7),
-                          child: InkWell(
-                            onTap: () => _showTaskDetails(
-                              context,
-                              controller,
-                              task,
-                              day,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                children: [
-                                  if (task.isFocus)
-                                    const Padding(
-                                      padding: EdgeInsets.only(right: 6),
-                                      child: AppIcon(
-                                        AppGlyph.target,
-                                        size: 15,
-                                        color: YushiColors.cobalt,
-                                      ),
-                                    ),
-                                  Expanded(
-                                    child: Text(
-                                      task.title,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.copyWith(
-                                            decoration:
-                                                controller.completed(task, day)
-                                                ? TextDecoration.lineThrough
-                                                : null,
-                                          ),
-                                    ),
-                                  ),
-                                  if (task.timeMinutes != null)
-                                    Text(
-                                      _time(task.timeMinutes!),
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-          ),
-          const AppIcon(
-            AppGlyph.chevronRight,
-            size: 18,
-            color: YushiColors.secondary,
-          ),
-        ],
-      ),
-    ),
-  );
 }
 
 class ProjectsScreen extends StatelessWidget {
@@ -1305,23 +327,20 @@ class ProjectsScreen extends StatelessWidget {
     final archivedProjects = projects
         .where((project) => project.status == ProjectStatus.archived)
         .toList();
-    final inbox = controller.snapshot.tasks
-        .where((task) => task.status == TaskStatus.inbox)
-        .toList();
     final archivedTasks = controller.snapshot.tasks
         .where((task) => task.status == TaskStatus.archived)
         .toList();
     return ListView(
       padding: const EdgeInsets.fromLTRB(22, 20, 22, 34),
       children: [
-        Text('选择与保留', style: Theme.of(context).textTheme.bodySmall),
+        Text('随时可以回来', style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 13),
         Text.rich(
           TextSpan(
             children: [
-              const TextSpan(text: '知道在做什么，\n'),
+              const TextSpan(text: '那些一直\n'),
               TextSpan(
-                text: '也知道为何。',
+                text: '在意的事。',
                 style: Theme.of(
                   context,
                 ).textTheme.headlineLarge?.copyWith(color: YushiColors.cobalt),
@@ -1334,7 +353,7 @@ class ProjectsScreen extends StatelessWidget {
         if (currentProjects.isEmpty)
           Text(
             archivedProjects.isEmpty
-                ? '还没有项目。项目用来保存长期方向，今天只需要做下一步。'
+                ? '项目保存你在意的方向，也保存上次留下的线索。'
                 : '当前没有进行中的项目，已归档内容保留在下方。',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
@@ -1405,35 +424,6 @@ class ProjectsScreen extends StatelessWidget {
             ],
           ),
         ],
-        const SizedBox(height: 25),
-        Row(
-          children: [
-            const AppIcon(AppGlyph.inbox, size: 20),
-            const SizedBox(width: 8),
-            Text('收集箱', style: Theme.of(context).textTheme.titleMedium),
-            const Spacer(),
-            Text(
-              '${inbox.length}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (inbox.isEmpty)
-          Text(
-            '想到的事情可以先放这里，不必马上安排。',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ...inbox.map(
-          (task) => ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(task.title),
-            trailing: IconButton(
-              onPressed: () => _scheduleInbox(context, controller, task),
-              icon: const AppIcon(AppGlyph.calendar),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -1454,13 +444,6 @@ class _ProjectRow extends StatelessWidget {
   final AppController controller;
   @override
   Widget build(BuildContext context) {
-    final active = controller.snapshot.tasks
-        .where(
-          (task) =>
-              task.projectId == project.id &&
-              task.status != TaskStatus.archived,
-        )
-        .length;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: const BoxDecoration(
@@ -1469,24 +452,30 @@ class _ProjectRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 38,
-            child: Text(
-              index.toString().padLeft(2, '0'),
-              style: const TextStyle(
-                fontFamily: null,
-                fontSize: 18,
-                color: YushiColors.cobalt,
-              ),
-            ),
-          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  project.title,
-                  style: Theme.of(context).textTheme.titleMedium,
+                InkWell(
+                  onTap: () => _openProject(context, controller, project),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Text(
+                      project.title,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ),
+                if (project.lastProgress.isNotEmpty)
+                  Text('上次：${project.lastProgress}'),
+                if (project.nextStep.isNotEmpty)
+                  Text(
+                    '接下来可以：${project.nextStep}',
+                    style: const TextStyle(color: YushiColors.cobalt),
+                  ),
+                TextButton(
+                  onPressed: () => _openProject(context, controller, project),
+                  child: const Text('打开项目'),
                 ),
                 if (project.reason.isNotEmpty)
                   Padding(
@@ -1499,7 +488,7 @@ class _ProjectRow extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 5),
                   child: Text(
-                    '$active 个未归档任务 · ${_projectStatus(project.status)}',
+                    _projectStatus(project.status),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
@@ -1543,6 +532,18 @@ class _ProjectRow extends StatelessWidget {
   }
 }
 
+Future<void> _openProject(
+  BuildContext context,
+  AppController controller,
+  ProjectItem project,
+) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  showDragHandle: true,
+  builder: (_) => ProjectSpaceSheet(controller: controller, project: project),
+);
+
 class SharePlanScreen extends StatefulWidget {
   const SharePlanScreen({super.key, required this.controller});
   final AppController controller;
@@ -1563,7 +564,7 @@ class _SharePlanScreenState extends State<SharePlanScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('分享今日计划')),
+    appBar: AppBar(title: const Text('分享今天的安排')),
     body: ListView(
       padding: const EdgeInsets.all(22),
       children: [
@@ -1637,9 +638,9 @@ class _SharePlanScreenState extends State<SharePlanScreen> {
       final bytes = await capture();
       await Gal.putImageBytes(
         bytes,
-        name: '余时-今日计划-${dateKey(DateTime.now())}',
+        name: '余时-今天的安排-${dateKey(DateTime.now())}',
       );
-      if (mounted) _snack(context, '今日计划已保存到相册');
+      if (mounted) _snack(context, '今天的安排已保存到相册');
     } catch (e) {
       if (mounted) _snack(context, '保存失败：$e');
     } finally {
@@ -1653,11 +654,11 @@ class _SharePlanScreenState extends State<SharePlanScreen> {
       final bytes = await capture();
       final directory = await getTemporaryDirectory();
       final file = File(
-        p.join(directory.path, '余时-今日计划-${dateKey(DateTime.now())}.png'),
+        p.join(directory.path, '余时-今天的安排-${dateKey(DateTime.now())}.png'),
       );
       await file.writeAsBytes(bytes, flush: true);
       await SharePlus.instance.share(
-        ShareParams(title: '余时 · 今日计划', files: [XFile(file.path)]),
+        ShareParams(title: '余时 · 今天的安排', files: [XFile(file.path)]),
       );
     } catch (e) {
       if (mounted) _snack(context, '分享面板打开失败：$e');
@@ -1711,14 +712,17 @@ class PlanPoster extends StatelessWidget {
           ],
         ),
         const Divider(height: 28, color: YushiColors.ink),
-        Text('今日计划', style: Theme.of(context).textTheme.headlineMedium),
+        Text('今天的安排', style: Theme.of(context).textTheme.headlineMedium),
         Text(
           _fullDate(DateTime.now()),
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 28),
         if (tasks.isEmpty) ...[
-          Text('今天留白。', style: Theme.of(context).textTheme.headlineMedium),
+          Text(
+            '今天没有注明日期的安排。',
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
           const SizedBox(height: 8),
           Text('给自己一点从容的空间。', style: Theme.of(context).textTheme.bodyMedium),
         ] else
@@ -1761,7 +765,7 @@ class PlanPoster extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '${tasks[i].isFocus ? '今日重点 · ' : ''}${_projectName(controller.snapshot, tasks[i])}',
+                          _projectName(controller.snapshot, tasks[i]),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         if (includeTimes)
@@ -1769,10 +773,11 @@ class PlanPoster extends StatelessWidget {
                             [
                               if (tasks[i].timeMinutes != null)
                                 _time(tasks[i].timeMinutes!),
-                              '约 ${tasks[i].estimateMins} 分钟',
+                              if (tasks[i].estimateMins > 0)
+                                '约 ${tasks[i].estimateMins} 分钟',
                               controller.completed(tasks[i], DateTime.now())
                                   ? '已完成'
-                                  : '待完成',
+                                  : '已安排',
                             ].join(' · '),
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
@@ -1784,7 +789,7 @@ class PlanPoster extends StatelessWidget {
             ),
         const SizedBox(height: 34),
         Text(
-          '有所选择，也有所留白。',
+          '在意的事，随时可以继续。',
           style: Theme.of(
             context,
           ).textTheme.titleMedium?.copyWith(color: YushiColors.cobalt),
@@ -2026,7 +1031,8 @@ class _SettingsAction extends StatelessWidget {
 Future<void> showTaskEditor(
   BuildContext context,
   AppController controller, {
-  required DateTime initialDate,
+  DateTime? initialDate,
+  String? projectId,
   bool focus = false,
 }) async {
   await showModalBottomSheet<void>(
@@ -2037,6 +1043,7 @@ Future<void> showTaskEditor(
       controller: controller,
       initialDate: initialDate,
       initialFocus: focus,
+      initialProjectId: projectId,
     ),
   );
 }
@@ -2047,10 +1054,12 @@ class TaskEditorSheet extends StatefulWidget {
     required this.controller,
     required this.initialDate,
     required this.initialFocus,
+    this.initialProjectId,
   });
   final AppController controller;
-  final DateTime initialDate;
+  final DateTime? initialDate;
   final bool initialFocus;
+  final String? initialProjectId;
   @override
   State<TaskEditorSheet> createState() => _TaskEditorSheetState();
 }
@@ -2058,19 +1067,20 @@ class TaskEditorSheet extends StatefulWidget {
 class _TaskEditorSheetState extends State<TaskEditorSheet> {
   final title = TextEditingController();
   final note = TextEditingController();
-  late DateTime day;
+  DateTime? day;
   late bool focus;
   bool private = false;
   bool busy = false;
-  int estimate = 25;
+  int estimate = 0;
   int? timeMinutes;
   String? projectId;
   RecurrenceType recurrence = RecurrenceType.none;
   @override
   void initState() {
     super.initState();
-    day = dateOnly(widget.initialDate);
+    day = widget.initialDate == null ? null : dateOnly(widget.initialDate!);
     focus = widget.initialFocus;
+    projectId = widget.initialProjectId;
   }
 
   @override
@@ -2107,14 +1117,14 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
             children: [
               Expanded(
                 child: Text(
-                  '安排一件具体的事',
+                  day == null ? '记下一件事' : '安排一件具体的事',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
               const SizedBox(width: 12),
               FilledButton(
                 onPressed: busy ? null : save,
-                child: Text(busy ? '保存中…' : '加入计划'),
+                child: Text(busy ? '保存中…' : (day == null ? '记下' : '加入计划')),
               ),
             ],
           ),
@@ -2129,7 +1139,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
           TextField(
             controller: note,
             maxLines: 2,
-            decoration: const InputDecoration(labelText: '做到哪里就够了（可选）'),
+            decoration: const InputDecoration(labelText: '补充、线索或想法（可选）'),
           ),
           const SizedBox(height: 12),
           Row(
@@ -2138,8 +1148,8 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const AppIcon(AppGlyph.calendar),
-                  title: const Text('计划日期'),
-                  subtitle: Text(_monthDay(day)),
+                  title: const Text('日期（可选）'),
+                  subtitle: Text(day == null ? '暂不安排' : _monthDay(day!)),
                   onTap: pickDate,
                 ),
               ),
@@ -2151,71 +1161,94 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                   subtitle: Text(
                     timeMinutes == null ? '不限定' : _time(timeMinutes!),
                   ),
-                  onTap: pickTime,
+                  onTap: day == null ? null : pickTime,
                 ),
               ),
             ],
           ),
-          DropdownButtonFormField<int>(
-            initialValue: estimate,
-            decoration: const InputDecoration(labelText: '预计时长'),
-            items: const [10, 15, 25, 30, 45, 60, 90]
-                .map(
-                  (value) =>
-                      DropdownMenuItem(value: value, child: Text('$value 分钟')),
-                )
-                .toList(),
-            onChanged: (value) => setState(() => estimate = value ?? 25),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String?>(
-            initialValue: projectId,
-            decoration: const InputDecoration(labelText: '所属项目（可选）'),
-            items: [
-              const DropdownMenuItem<String?>(value: null, child: Text('无项目')),
-              ...widget.controller.snapshot.projects
-                  .where((project) => project.status == ProjectStatus.active)
-                  .map(
-                    (project) => DropdownMenuItem<String?>(
-                      value: project.id,
-                      child: Text(project.title),
-                    ),
+          if (day != null)
+            TextButton(
+              onPressed: () => setState(() {
+                day = null;
+                timeMinutes = null;
+                recurrence = RecurrenceType.none;
+                focus = false;
+              }),
+              child: const Text('取消日期，先记着'),
+            ),
+          ExpansionTile(
+            title: const Text('更多选项'),
+            tilePadding: EdgeInsets.zero,
+            children: [
+              DropdownButtonFormField<int>(
+                initialValue: estimate,
+                decoration: const InputDecoration(labelText: '预计时长'),
+                items: const [0, 10, 15, 25, 30, 45, 60, 90]
+                    .map(
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text(value == 0 ? '不估算' : '$value 分钟'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => setState(() => estimate = value ?? 25),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                initialValue: projectId,
+                decoration: const InputDecoration(labelText: '所属项目（可选）'),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('无项目'),
                   ),
-            ],
-            onChanged: (value) => setState(() => projectId = value),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<RecurrenceType>(
-            initialValue: recurrence,
-            decoration: const InputDecoration(labelText: '重复'),
-            items: const [
-              DropdownMenuItem(value: RecurrenceType.none, child: Text('不重复')),
-              DropdownMenuItem(value: RecurrenceType.daily, child: Text('每天')),
-              DropdownMenuItem(
-                value: RecurrenceType.weekdays,
-                child: Text('工作日'),
+                  ...widget.controller.snapshot.projects
+                      .where(
+                        (project) => project.status == ProjectStatus.active,
+                      )
+                      .map(
+                        (project) => DropdownMenuItem<String?>(
+                          value: project.id,
+                          child: Text(project.title),
+                        ),
+                      ),
+                ],
+                onChanged: (value) => setState(() => projectId = value),
               ),
-              DropdownMenuItem(
-                value: RecurrenceType.weeklyTarget,
-                child: Text('每周一次'),
+              const SizedBox(height: 12),
+              if (day != null)
+                DropdownButtonFormField<RecurrenceType>(
+                  initialValue: recurrence,
+                  decoration: const InputDecoration(labelText: '重复'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: RecurrenceType.none,
+                      child: Text('不重复'),
+                    ),
+                    DropdownMenuItem(
+                      value: RecurrenceType.daily,
+                      child: Text('每天'),
+                    ),
+                    DropdownMenuItem(
+                      value: RecurrenceType.weekdays,
+                      child: Text('工作日'),
+                    ),
+                    DropdownMenuItem(
+                      value: RecurrenceType.weeklyTarget,
+                      child: Text('每周一次'),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => recurrence = value ?? RecurrenceType.none),
+                ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('私密事项'),
+                subtitle: const Text('生成分享图片时默认隐藏'),
+                value: private,
+                onChanged: (value) => setState(() => private = value),
               ),
             ],
-            onChanged: (value) =>
-                setState(() => recurrence = value ?? RecurrenceType.none),
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('设为当天重点'),
-            subtitle: const Text('当天只突出一件重点，其他安排仍会显示'),
-            value: focus,
-            onChanged: (value) => setState(() => focus = value),
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('私密事项'),
-            subtitle: const Text('生成分享图片时默认隐藏'),
-            value: private,
-            onChanged: (value) => setState(() => private = value),
           ),
           const SizedBox(height: 8),
         ],
@@ -2226,7 +1259,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   Future<void> pickDate() async {
     final value = await showDatePicker(
       context: context,
-      initialDate: day,
+      initialDate: day ?? DateTime.now(),
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 3650)),
     );
@@ -2264,7 +1297,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
         recurrence: RecurrenceRule(type: recurrence, weeklyTarget: 1),
       );
       if (mounted) {
-        _snack(context, '已加入 ${_monthDay(day)}的计划');
+        _snack(context, day == null ? '已记下' : '已加入 ${_monthDay(day!)}的计划');
         Navigator.pop(context);
       }
     } catch (e) {
@@ -2306,11 +1339,12 @@ Future<void> _showTaskDetails(
             await action();
             if (sheetContext.mounted) Navigator.pop(sheetContext);
           } catch (_) {
-            if (sheetContext.mounted)
+            if (sheetContext.mounted) {
               setSheetState(() {
                 busy = false;
                 failure = '保存失败，请重试';
               });
+            }
           }
         }
 
@@ -2336,7 +1370,9 @@ Future<void> _showTaskDetails(
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        completed ? '已完成' : '待完成',
+                        completed
+                            ? '已完成'
+                            : (task.plannedDate == null ? '已记下' : '已安排'),
                         style: TextStyle(
                           color: completed
                               ? YushiColors.success
@@ -2374,7 +1410,9 @@ Future<void> _showTaskDetails(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _fullDate(day),
+                        task.plannedDate == null
+                            ? '暂不安排日期'
+                            : _fullDate(task.plannedDate!),
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       const SizedBox(height: 6),
@@ -2383,7 +1421,8 @@ Future<void> _showTaskDetails(
                           _projectName(controller.snapshot, task),
                           if (task.timeMinutes != null)
                             _time(task.timeMinutes!),
-                          '约 ${task.estimateMins} 分钟',
+                          if (task.estimateMins > 0)
+                            '约 ${task.estimateMins} 分钟',
                         ].join(' · '),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
@@ -2395,6 +1434,11 @@ Future<void> _showTaskDetails(
                     padding: const EdgeInsets.only(top: 16),
                     child: Text(task.note),
                   ),
+                if (task.deadline != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text('截止日期：${_fullDate(task.deadline!)}'),
+                  ),
                 if (failure != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
@@ -2404,15 +1448,44 @@ Future<void> _showTaskDetails(
                     ),
                   ),
                 const SizedBox(height: 24),
+                TextButton(
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          final selected = await showDatePicker(
+                            context: sheetContext,
+                            initialDate: DateTime.now(),
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 365),
+                            ),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 3650),
+                            ),
+                          );
+                          if (selected != null && sheetContext.mounted) {
+                            await perform(
+                              () => controller.postpone(task, selected),
+                            );
+                          }
+                        },
+                  child: Text(task.plannedDate == null ? '选择日期' : '调整日期'),
+                ),
+                if (task.plannedDate != null)
+                  TextButton(
+                    onPressed: busy
+                        ? null
+                        : () => perform(() => controller.unschedule(task)),
+                    child: const Text('取消安排，保留想法'),
+                  ),
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton.icon(
+                  child: OutlinedButton.icon(
                     onPressed: busy
                         ? null
                         : () => perform(
                             () => controller.toggleComplete(task, day),
                           ),
-                    style: FilledButton.styleFrom(
+                    style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -2471,71 +1544,6 @@ Future<void> _showTaskDetails(
           ),
         );
       },
-    ),
-  );
-}
-
-Future<void> _showAdjust(
-  BuildContext context,
-  AppController controller,
-  TaskItem task,
-  DateTime day,
-) async {
-  await showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: YushiColors.background,
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.fromLTRB(
-        22,
-        22,
-        22,
-        MediaQuery.viewInsetsOf(sheetContext).bottom + 22,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('按今天的实际情况', style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 8),
-          Text(
-            '可以改到明天，或者今天先放下。真实截止日期不会被改变。',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 15),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const AppIcon(AppGlyph.calendar),
-            title: const Text('改到明天'),
-            onTap: () async {
-              await controller.postpone(task, day.add(const Duration(days: 1)));
-              if (sheetContext.mounted) Navigator.pop(sheetContext);
-            },
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const AppIcon(AppGlyph.archive),
-            title: const Text('暂时放下'),
-            subtitle: const Text('归档任务，以后仍可在备份中保留'),
-            onTap: () async {
-              try {
-                await controller.archiveTask(task);
-                if (sheetContext.mounted) {
-                  _snack(sheetContext, '已归档任务，记录仍然保留');
-                  Navigator.pop(sheetContext);
-                }
-              } catch (error) {
-                if (sheetContext.mounted) {
-                  _snack(sheetContext, '归档失败：$error');
-                }
-              }
-            },
-          ),
-          InputDecorator(
-            decoration: const InputDecoration(labelText: '下次从哪里继续？'),
-            child: Text(task.note.isEmpty ? '还没有记录' : task.note),
-          ),
-        ],
-      ),
     ),
   );
 }
@@ -2746,36 +1754,6 @@ Future<void> _confirmDeleteTask(
     if (messenger.mounted) {
       messenger.showSnackBar(SnackBar(content: Text('删除失败：$error')));
     }
-  }
-}
-
-Future<void> _scheduleInbox(
-  BuildContext context,
-  AppController controller,
-  TaskItem task,
-) async {
-  final today = dateOnly(DateTime.now());
-  final tasks = controller.snapshot.tasks
-      .map(
-        (item) => item.id == task.id
-            ? item.copyWith(
-                status: TaskStatus.planned,
-                plannedDate: today,
-                updatedAt: DateTime.now(),
-              )
-            : item,
-      )
-      .toList();
-  await controller.repository.save(controller.snapshot.copyWith(tasks: tasks));
-  await controller.initialize();
-  if (context.mounted) _snack(context, '已安排到今天');
-}
-
-Future<void> _run(BuildContext context, Future<void> Function() action) async {
-  try {
-    await action();
-  } catch (e) {
-    if (context.mounted) _snack(context, '操作失败：$e');
   }
 }
 

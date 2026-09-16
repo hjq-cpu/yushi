@@ -14,6 +14,8 @@
 
 ## 模型
 
+0.3 新增：`ProjectItem.lastProgress`、`nextStep`（缺省空文本）及 `progress`（缺省空数组）。`ProjectProgress({required String text, required DateTime createdAt})` 使用 `toJson/fromJson`，每次非空进展追加保存。旧版上下文首次写入时保留为历史；备份冲突按项目整体保留本地版本。业务创建无日期记录时 estimateMins 默认 0，表示不估算。
+
 - `TaskItem({required String id, required String title, String note = '', String? projectId, TaskStatus status = TaskStatus.inbox, DateTime? plannedDate, DateTime? deadline, int? timeMinutes, int estimateMins = 25, bool isFocus = false, bool isPrivate = false, RecurrenceRule recurrence = const RecurrenceRule(), required DateTime createdAt, required DateTime updatedAt})`
 - `TaskStatus`: `inbox, active, planned, someday, archived`。
 - `ProjectItem({required String id, required String title, String reason = '', String weekGoal = '', ProjectStatus status = ProjectStatus.active, required DateTime createdAt, required DateTime updatedAt})`
