@@ -92,6 +92,10 @@ open class TodayWidget : AppWidgetProvider() {
                         if (cursor.moveToFirst()) JSONObject(cursor.getString(0)) else null
                     }
                     if (data != null) {
+                        val task = (data.optJSONArray("tasks") ?: JSONArray()).objects().firstOrNull { it.optString("id") == taskId }
+                        if (task == null || task.optString("status") == "archived" || task.optString("phase") == "completed") return
+                        task.put("phase", "completed").put("updatedAt", timestamp)
+
                         val records = data.optJSONArray("completions") ?: JSONArray().also {
                             data.put("completions", it)
                         }
@@ -140,7 +144,7 @@ open class TodayWidget : AppWidgetProvider() {
             val rowHeight = maxOf(48f, 24f * fontScale + 16)
             val rowCount = ((height - 32 - maxOf(48f, 26f * fontScale) - 22 * fontScale - 8) / rowHeight).toInt().coerceIn(1, 8)
             val views = RemoteViews(context.packageName, R.layout.today_widget)
-            views.setTextViewText(R.id.widget_heading, SimpleDateFormat(if (width < 220) "M月d日" else "M月d日 EEEE", Locale.CHINA).format(Date()))
+            views.setTextViewText(R.id.widget_heading, "余时 · 待办")
             views.setTextViewTextSize(R.id.widget_heading, TypedValue.COMPLEX_UNIT_SP, 20f)
             val open = PendingIntent.getActivity(
                 context, 0,
@@ -162,85 +166,40 @@ open class TodayWidget : AppWidgetProvider() {
                 views.setTextViewText(R.id.widget_progress, "读取失败 · 点击刷新")
                 views.setViewVisibility(R.id.widget_task_list, View.GONE)
                 views.setViewVisibility(R.id.widget_empty, View.VISIBLE)
-                views.setTextViewText(R.id.widget_empty, "暂时无法读取计划")
+                views.setTextViewText(R.id.widget_empty, "暂时无法读取事项")
             }
             manager.updateAppWidget(id, views)
             }
         }
 
         private fun showTasks(context: Context, views: RemoteViews, data: JSONObject, rowCount: Int, compact: Boolean) {
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            val cal = Calendar.getInstance()
-            val today = dateFormat.format(cal.time)
-            val weekday = (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7 + 1
-            val startsOn = data.optJSONObject("settings")?.optInt("weekStartsOn", 1) ?: 1
-            cal.add(Calendar.DAY_OF_MONTH, -((weekday - startsOn + 7) % 7))
-            val weekStart = dateFormat.format(cal.time)
-            cal.add(Calendar.DAY_OF_MONTH, 7)
-            val weekEnd = dateFormat.format(cal.time)
             val projects = (data.optJSONArray("projects") ?: JSONArray()).objects()
             val records = (data.optJSONArray("completions") ?: JSONArray()).objects()
-            val completed: (JSONObject) -> Boolean = { task ->
-                records.any {
-                    it.optString("taskId") == task.optString("id") &&
-                        it.optString("status") == "completed" &&
-                        if (task.getJSONObject("recurrence").optString("type") == "none") {
-                            it.optString("date") <= today
-                        } else it.optString("date") == today
-                }
-            }
+            fun phase(task: JSONObject): String = if (task.has("phase")) task.optString("phase") else
+                if (task.optJSONObject("recurrence")?.optString("type") == "none" && records.any {
+                    it.optString("taskId") == task.optString("id") && it.optString("status") == "completed"
+                }) "completed" else "pending"
             val tasks = (data.optJSONArray("tasks") ?: JSONArray()).objects().filter { task ->
-                val project = if (task.isNull("projectId")) null else task.optString("projectId")
-                val planned = if (task.isNull("plannedDate")) "" else task.optString("plannedDate")
-                val rule = task.getJSONObject("recurrence")
-                val entries = records.filter { it.optString("taskId") == task.optString("id") }
-                task.optString("status") in listOf("active", "planned") &&
-                    (project == null || projects.any {
-                        it.optString("id") == project && it.optString("status") == "active"
-                    }) && planned <= today && task.optString("createdAt").take(10) <= today &&
-                    (entries.any { it.optString("date") == today } || when (rule.optString("type")) {
-                        "none" -> planned == today && !completed(task)
-                        "daily" -> true
-                        "weekdays" -> weekday <= 5
-                        "selectedWeekdays" -> rule.getJSONArray("weekdays").let { days ->
-                            (0 until days.length()).any { days.getInt(it) == weekday }
-                        }
-                        "weeklyTarget" -> entries.count {
-                            it.optString("status") == "completed" &&
-                                it.optString("date") >= weekStart && it.optString("date") < weekEnd
-                        } < rule.optInt("weeklyTarget", 1)
-                        else -> false
-                    })
-            }.sortedWith(
-                compareByDescending<JSONObject> { it.optBoolean("isFocus") }
-                    .thenBy { if (it.isNull("timeMinutes")) 1440 else it.optInt("timeMinutes") }
-                    .thenBy { it.optString("createdAt") }.thenBy { it.optString("id") },
-            )
-            val pending = tasks.filter { task ->
-                !completed(task) && !records.any {
-                    it.optString("taskId") == task.optString("id") &&
-                        it.optString("date") == today && it.optString("status") == "skipped"
-                }
-            }
+                task.optString("status") != "archived" && phase(task) != "completed" &&
+                !projects.any { it.optString("id") == task.optString("projectId") && it.optString("status") == "archived" }
+            }.sortedWith(compareBy<JSONObject> { if (phase(it) == "doing") 0 else 1 }.thenBy { it.optString("createdAt") })
+            val pending = tasks
             views.setTextViewText(
                 R.id.widget_progress,
-                "今天的安排",
+                "在做与待办",
             )
             views.setViewVisibility(R.id.widget_task_list, if (pending.isEmpty()) View.GONE else View.VISIBLE)
             views.setViewVisibility(R.id.widget_progress, if (tasks.isEmpty()) View.GONE else View.VISIBLE)
             views.setViewVisibility(R.id.widget_empty, if (pending.isEmpty()) View.VISIBLE else View.GONE)
-            views.setTextViewText(R.id.widget_empty, if (tasks.isEmpty()) "暂无安排" else "暂无其他安排")
+            views.setTextViewText(R.id.widget_empty, if (tasks.isEmpty()) "暂时没有待办" else "暂时没有待办")
             taskViewIds.forEachIndexed { index, viewId ->
                 val task = if (index < rowCount) pending.getOrNull(index) else null
                 views.setViewVisibility(viewId, if (task == null) View.GONE else View.VISIBLE)
                 if (task != null) {
-                    val time = if (task.isNull("timeMinutes")) "" else task.optInt("timeMinutes").let {
-                        String.format(Locale.US, "%02d:%02d  ", it / 60, it % 60)
-                    }
                     val title = task.optString("title").replace('\n', ' ')
                     views.setTextViewText(
                         viewId,
-                        "○  $time$title",
+                        "○  ${if (phase(task) == "doing") "在做 · " else ""}$title",
                     )
                     views.setContentDescription(viewId, "完成$title")
                     views.setOnClickPendingIntent(

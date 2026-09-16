@@ -35,7 +35,7 @@ void main() {
     expect(controller.snapshot.tasks.single.estimateMins, 0);
     expect(controller.forDay(now), isEmpty);
     await controller.postpone(controller.snapshot.tasks.single, now);
-    expect(controller.forDay(now), hasLength(1));
+    expect(controller.openTasks, hasLength(1));
     await controller.unschedule(controller.snapshot.tasks.single);
     expect(controller.forDay(now), isEmpty);
     expect((await repository.load()).tasks.single.note, '先查资料');

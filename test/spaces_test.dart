@@ -7,7 +7,7 @@ import 'package:yushi/domain/models.dart';
 import 'package:yushi/ui/app.dart';
 
 void main() {
-  testWidgets('首页不展示排期格子，项目留下的过程进入足迹', (tester) async {
+  testWidgets('首页展示持久事项，搜索过滤，完成后移入记录', (tester) async {
     await tester.binding.setSurfaceSize(const Size(420, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     sqfliteFfiInit();
@@ -25,32 +25,35 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('节奏'), findsNothing);
     expect(find.text('今天的安排'), findsNothing);
-    expect(find.text('此刻，随你。'), findsOneWidget);
-    await tester.tap(find.text('打开看看 →'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, '留下一点进展'), '试了两种颜色');
-    await tester.enterText(
-      find.widgetWithText(TextField, '下次可以从哪开始（可选）'),
-      '看看混色效果',
-    );
+    expect(find.text('一件一件，慢慢来。'), findsOneWidget);
     await tester.runAsync(() async {
-      await tester.tap(find.text('留下这段记录'));
-      for (
-        var i = 0;
-        i < 100 && controller.snapshot.projects.single.progress.isEmpty;
-        i++
-      ) {
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      }
+      await controller.addTask(
+        title: '画一张速写',
+        projectId: controller.snapshot.projects.single.id,
+      );
+      await controller.setPhase(
+        controller.snapshot.tasks.single,
+        TaskPhase.doing,
+      );
     });
     await tester.pumpAndSettle();
-    expect(controller.snapshot.projects.single.progress.single.text, '试了两种颜色');
-    await tester.tap(find.byTooltip('关闭项目'));
+    expect(find.text('画一张速写'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, '搜索事项'), '不存在');
     await tester.pumpAndSettle();
-    await tester.tap(find.text('足迹'));
+    expect(find.text('画一张速写'), findsNothing);
+    await tester.enterText(find.widgetWithText(TextField, '搜索事项'), '');
     await tester.pumpAndSettle();
-    expect(find.text('试了两种颜色'), findsOneWidget);
-    expect(find.text('完成率'), findsNothing);
+    await tester.runAsync(() async {
+      await controller.toggleComplete(
+        controller.snapshot.tasks.single,
+        DateTime.now(),
+      );
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('画一张速写'), findsNothing);
+    await tester.tap(find.text('完成记录'));
+    await tester.pumpAndSettle();
+    expect(find.text('画一张速写'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.runAsync(repository.close);
@@ -73,14 +76,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('有日期的事'));
     await tester.pumpAndSettle();
-    expect(find.text('记一个约定'), findsOneWidget);
+    expect(find.text('日期是一条信息，不改变事项的状态。'), findsOneWidget);
     expect(find.text('去骑行'), findsOneWidget);
     expect(find.textContaining('无安排 · 点击添加'), findsNothing);
     await tester.tap(find.text('去骑行'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('取消安排，保留想法'));
+    await tester.ensureVisible(find.text('移除约定日期'));
     await tester.runAsync(() async {
-      await tester.tap(find.text('取消安排，保留想法'));
+      await tester.tap(find.text('移除约定日期'));
       for (
         var i = 0;
         i < 100 && controller.snapshot.tasks.single.plannedDate != null;
@@ -92,7 +95,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(controller.snapshot.tasks.single.status, TaskStatus.inbox);
     expect(find.text('去骑行'), findsNothing);
-    expect(find.text('这段时间没有注明日期的事。'), findsOneWidget);
+    expect(find.text('还没有注明约定或截止日期的事项。'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.runAsync(repository.close);

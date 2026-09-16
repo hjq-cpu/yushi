@@ -26,7 +26,7 @@ void main() {
     await tester.pumpWidget(YushiApp(controller: controller));
     await tester.pumpAndSettle();
     expect(find.text('给在意的事，留一点时间'), findsOneWidget);
-    await tester.tap(find.text('开始今天'));
+    await tester.tap(find.text('开始使用'));
     await tester.pumpAndSettle();
     expect(controller.snapshot.settings.onboardingCompleted, isFalse);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -36,7 +36,7 @@ void main() {
     await tester.tap(find.text('以后不再提示'));
     await tester.pump();
     await tester.runAsync(() async {
-      await tester.tap(find.text('开始今天'));
+      await tester.tap(find.text('开始使用'));
       for (
         var i = 0;
         i < 100 && !controller.snapshot.settings.onboardingCompleted;
@@ -102,7 +102,7 @@ void main() {
     rendered.dispose();
     expect(tester.takeException(), isNull);
   });
-  testWidgets('首页首先呈现今天和快速记录', (tester) async {
+  testWidgets('首页呈现待办与快速记录', (tester) async {
     sqfliteFfiInit();
     final repository = LocalRepository(
       databaseFactory: databaseFactoryFfi,
@@ -114,9 +114,9 @@ void main() {
     await tester.pumpWidget(_appWithoutIntroduction(controller));
     await tester.pump();
 
-    expect(find.text('此刻，随你。'), findsOneWidget);
-    expect(find.byType(TextField), findsOneWidget);
-    expect(find.text('此刻'), findsOneWidget);
+    expect(find.text('一件一件，慢慢来。'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '想到什么，先记下来…'), findsOneWidget);
+    expect(find.text('待办'), findsWidgets);
   });
 
   testWidgets('创建项目后安全关闭弹窗并显示项目', (tester) async {
@@ -128,7 +128,7 @@ void main() {
     final controller = AppController(repository)..loading = false;
 
     await tester.pumpWidget(_appWithoutIntroduction(controller));
-    await tester.tap(find.text('在意'));
+    await tester.tap(find.text('项目'));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('新建项目'));
     await tester.pumpAndSettle();
@@ -186,7 +186,7 @@ void main() {
       ..loading = false;
 
     await tester.pumpWidget(_appWithoutIntroduction(controller));
-    await tester.tap(find.text('在意'));
+    await tester.tap(find.text('项目'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('管理项目'));
     await tester.pumpAndSettle();

@@ -16,7 +16,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="今天"
+            android:text="余时 · 待办"
             android:textColor="#18243C"
             android:textSize="20sp"
             android:textStyle="bold" />
@@ -25,7 +25,7 @@
             android:id="@+id/widget_refresh"
             android:layout_width="44dp"
             android:layout_height="48dp"
-            android:contentDescription="刷新今天的安排"
+            android:contentDescription="刷新待办事项"
             android:gravity="center"
             android:text="刷新"
             android:textColor="#2F5CF3"
@@ -37,7 +37,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
-        android:text="今天的安排"
+        android:text="待办事项"
         android:textColor="#46536B"
         android:textSize="14sp" />
 

@@ -3,166 +3,153 @@ part of 'app.dart';
 void _openDates(BuildContext context, AppController controller) => Navigator.of(
   context,
 ).push(MaterialPageRoute(builder: (_) => DatesScreen(controller: controller)));
+String _phaseName(TaskItem task) => switch (task.phase) {
+  TaskPhase.pending => '待办',
+  TaskPhase.doing => '在做',
+  TaskPhase.completed => '已完成',
+};
+String _taskMetadata(AppSnapshot snapshot, TaskItem task) => [
+  if (task.projectId != null) _projectName(snapshot, task),
+  if (task.plannedDate != null)
+    '约定 ${_fullDate(task.plannedDate!)}${task.timeMinutes == null ? '' : ' ${_time(task.timeMinutes!)}'}',
+  if (task.deadline != null) '截止 ${_fullDate(task.deadline!)}',
+].join(' · ');
 
-void _openIdeas(BuildContext context, AppController controller) => Navigator.of(
-  context,
-).push(MaterialPageRoute(builder: (_) => IdeasScreen(controller: controller)));
+class TaskLine extends StatelessWidget {
+  const TaskLine({super.key, required this.controller, required this.task});
+  final AppController controller;
+  final TaskItem task;
+  @override
+  Widget build(BuildContext context) => ListTile(
+    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+    leading: IconButton(
+      tooltip: task.phase == TaskPhase.completed ? '撤销完成' : '完成事项',
+      icon: Icon(
+        task.phase == TaskPhase.completed
+            ? Icons.check_circle
+            : Icons.radio_button_unchecked,
+        color: task.phase == TaskPhase.doing
+            ? YushiColors.cobalt
+            : YushiColors.secondary,
+      ),
+      onPressed: () async {
+        try {
+          await controller.toggleComplete(task, DateTime.now());
+        } catch (e) {
+          if (context.mounted) _snack(context, '保存失败：$e');
+        }
+      },
+    ),
+    title: Text(
+      task.title,
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+    ),
+    subtitle: _taskMetadata(controller.snapshot, task).isEmpty
+        ? null
+        : Text(_taskMetadata(controller.snapshot, task)),
+    onTap: () => _showTaskDetails(context, controller, task, DateTime.now()),
+  );
+}
 
-class NowScreen extends StatelessWidget {
+class NowScreen extends StatefulWidget {
   const NowScreen({super.key, required this.controller});
   final AppController controller;
   @override
+  State<NowScreen> createState() => _NowScreenState();
+}
+
+class _NowScreenState extends State<NowScreen> {
+  String query = '';
+  String? projectId;
+  @override
   Widget build(BuildContext context) {
-    final projects =
-        controller.snapshot.projects
-            .where((p) => p.status == ProjectStatus.active)
-            .toList()
-          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    final today = controller.forDay(DateTime.now());
-    final ideas = _openIdeasFor(controller);
+    final controller = widget.controller;
+    final tasks = controller.openTasks
+        .where(
+          (t) =>
+              (projectId == null || t.projectId == projectId) &&
+              '${t.title} ${t.note}'.toLowerCase().contains(
+                query.toLowerCase(),
+              ),
+        )
+        .toList();
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
       children: [
-        Text('此刻，随你。', style: Theme.of(context).textTheme.headlineLarge),
-        const SizedBox(height: 12),
-        const Text('有想法就记下，想继续时再回来。'),
-        const SizedBox(height: 28),
+        Text('一件一件，慢慢来。', style: Theme.of(context).textTheme.headlineMedium),
+        const SizedBox(height: 10),
+        const Text('事情留在这里，按自己的步调继续。'),
+        const SizedBox(height: 24),
         QuickCapture(controller: controller),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () => showTaskEditor(context, controller),
-            child: const Text('多写一点'),
-          ),
-        ),
-        const SizedBox(height: 28),
-        Text('在意的方向', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 16),
-        if (projects.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              color: YushiColors.focus,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('一个项目、一门爱好，或一件一直惦记的事。'),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => _addProject(context, controller),
-                  child: const Text('放下一件在意的事'),
-                ),
-              ],
-            ),
-          ),
-        for (final project in projects.take(2))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () => _openProject(context, controller, project),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  color: YushiColors.paper,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: YushiColors.rule),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      project.title,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.headlineMedium?.copyWith(fontSize: 24),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      project.lastProgress.isNotEmpty
-                          ? '上次留下：${project.lastProgress}'
-                          : project.reason.isNotEmpty
-                          ? project.reason
-                          : '还没有留下记录，随时可以开始。',
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (project.nextStep.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: Text(
-                          project.nextStep,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: YushiColors.cobalt),
-                        ),
-                      ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      '打开看看 →',
-                      style: TextStyle(color: YushiColors.cobalt),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        if (projects.length > 2) const Text('其他方向保留在「在意」里。'),
-        const SizedBox(height: 28),
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(
-              child: Text(
-                '随手留下',
-                style: Theme.of(context).textTheme.titleMedium,
+            TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => CompletedScreen(controller: controller),
+                ),
               ),
+              child: const Text('完成记录'),
             ),
             TextButton(
-              onPressed: () => _openIdeas(context, controller),
-              child: const Text('全部想法'),
+              onPressed: () => showTaskEditor(context, controller),
+              child: const Text('添加详细事项'),
             ),
           ],
         ),
-        if (ideas.isEmpty) const Text('这里不需要整理成任务。'),
-        for (final idea in ideas.take(3))
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(idea.title),
-            subtitle: idea.note.isEmpty
-                ? null
-                : Text(idea.note, maxLines: 2, overflow: TextOverflow.ellipsis),
-            onTap: () =>
-                _showTaskDetails(context, controller, idea, DateTime.now()),
+        TextField(
+          decoration: const InputDecoration(
+            hintText: '搜索事项',
+            prefixIcon: Icon(Icons.search),
           ),
-        const SizedBox(height: 28),
-        if (today.isNotEmpty)
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            title: const Text('今天有约定'),
-            subtitle: const Text('你主动注明日期的事'),
+          onChanged: (value) => setState(() => query = value),
+        ),
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
             children: [
-              for (final task in today)
-                ListTile(
-                  title: Text(task.title),
-                  subtitle: task.timeMinutes == null
-                      ? null
-                      : Text(_time(task.timeMinutes!)),
-                  onTap: () => _showTaskDetails(
-                    context,
-                    controller,
-                    task,
-                    DateTime.now(),
+              ChoiceChip(
+                label: const Text('全部项目'),
+                selected: projectId == null,
+                onSelected: (_) => setState(() => projectId = null),
+              ),
+              for (final project in controller.snapshot.projects.where(
+                (p) => p.status != ProjectStatus.archived,
+              ))
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: ChoiceChip(
+                    label: Text(project.title),
+                    selected: projectId == project.id,
+                    onSelected: (_) => setState(() => projectId = project.id),
                   ),
                 ),
-              TextButton(
-                onPressed: () => _openDates(context, controller),
-                child: const Text('查看日期'),
-              ),
             ],
           ),
+        ),
+        for (final phase in [TaskPhase.doing, TaskPhase.pending]) ...[
+          const SizedBox(height: 28),
+          Text(
+            phase == TaskPhase.doing ? '在做' : '待办',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          if (!tasks.any((t) => t.phase == phase))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                query.isNotEmpty || projectId != null
+                    ? '没有匹配的事项'
+                    : phase == TaskPhase.doing
+                    ? '想开始时，从待办里选一件。'
+                    : '想到什么，随手记下。',
+              ),
+            ),
+          for (final task in tasks.where((t) => t.phase == phase))
+            TaskLine(controller: controller, task: task),
+        ],
         if (controller.error != null)
           Text(
             controller.error!,
@@ -173,88 +160,35 @@ class NowScreen extends StatelessWidget {
   }
 }
 
-List<TaskItem> _openIdeasFor(AppController controller) {
-  final items = controller.snapshot.tasks
-      .where(
-        (t) =>
-            t.status != TaskStatus.archived &&
-            t.plannedDate == null &&
-            !controller.completed(t, DateTime.now()) &&
-            (t.projectId == null ||
-                controller.snapshot.projects.any(
-                  (p) =>
-                      p.id == t.projectId && p.status == ProjectStatus.active,
-                )),
-      )
-      .toList();
-  items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-  return items;
-}
-
-class IdeasScreen extends StatelessWidget {
-  const IdeasScreen({super.key, required this.controller});
+class CompletedScreen extends StatelessWidget {
+  const CompletedScreen({super.key, required this.controller});
   final AppController controller;
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: controller,
-    builder: (context, _) => Scaffold(
-      appBar: AppBar(title: const Text('随手留下')),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          const Text('想法可以一直是想法。'),
-          const SizedBox(height: 24),
-          QuickCapture(controller: controller),
-          const SizedBox(height: 24),
-          for (final task in _openIdeasFor(controller))
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(task.title),
-              subtitle: task.note.isEmpty ? null : Text(task.note),
-              onTap: () =>
-                  _showTaskDetails(context, controller, task, DateTime.now()),
-            ),
-        ],
-      ),
-    ),
-  );
-}
-
-class DatesScreen extends StatefulWidget {
-  const DatesScreen({super.key, required this.controller});
-  final AppController controller;
-  @override
-  State<DatesScreen> createState() => _DatesScreenState();
-}
-
-class _DatesScreenState extends State<DatesScreen> {
-  DateTime? selected;
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: widget.controller,
     builder: (context, _) {
-      final today = dateOnly(DateTime.now());
-      final days = selected == null
-          ? List.generate(
-              30,
-              (i) => DateTime(today.year, today.month, today.day + i),
-            )
-          : [selected!];
-      final populated = days
-          .where((d) => widget.controller.forDay(d).isNotEmpty)
-          .toList();
-      final earlier = pendingAdjustments(widget.controller.snapshot, today);
+      final tasks =
+          controller.snapshot.tasks
+              .where(
+                (t) =>
+                    t.phase == TaskPhase.completed &&
+                    t.status != TaskStatus.archived,
+              )
+              .toList()
+            ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       return Scaffold(
         appBar: AppBar(
-          title: const Text('有日期的事'),
+          title: const Text('完成记录'),
           actions: [
             IconButton(
-              tooltip: '分享今天',
-              icon: const AppIcon(AppGlyph.image),
+              tooltip: '历史记录',
+              icon: const Icon(Icons.history),
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) =>
-                      SharePlanScreen(controller: widget.controller),
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: const Text('历史记录')),
+                    body: FootprintsScreen(controller: controller),
+                  ),
                 ),
               ),
             ),
@@ -263,104 +197,42 @@ class _DatesScreenState extends State<DatesScreen> {
         body: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            Text(
-              '只放需要日期的事。',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 12),
-            const Text('约定、出行，或你主动安排的事情。其他内容留在想法和项目里。'),
-            const SizedBox(height: 24),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                OutlinedButton(
-                  onPressed: () => showTaskEditor(
-                    context,
-                    widget.controller,
-                    initialDate: selected ?? today,
-                  ),
-                  child: const Text('记一个约定'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    final value = await showDatePicker(
-                      context: context,
-                      initialDate: selected ?? today,
-                      firstDate: today.subtract(const Duration(days: 3650)),
-                      lastDate: today.add(const Duration(days: 3650)),
-                    );
-                    if (value != null && mounted) {
-                      setState(() => selected = value);
-                    }
-                  },
-                  child: Text(selected == null ? '查找日期' : _fullDate(selected!)),
-                ),
-                if (selected != null)
-                  TextButton(
-                    onPressed: () => setState(() => selected = null),
-                    child: const Text('近期安排'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 32),
-            if (selected == null) const Text('接下来 30 天'),
-            if (populated.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 28),
-                child: Text('这段时间没有注明日期的事。'),
+            if (tasks.isEmpty) const Text('完成的事情会留在这里。'),
+            for (final task in tasks)
+              TaskLine(controller: controller, task: task),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class DatesScreen extends StatelessWidget {
+  const DatesScreen({super.key, required this.controller});
+  final AppController controller;
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: controller,
+    builder: (context, _) {
+      final tasks =
+          controller.openTasks
+              .where((t) => t.plannedDate != null || t.deadline != null)
+              .toList()
+            ..sort(
+              (a, b) => (a.plannedDate ?? a.deadline!).compareTo(
+                b.plannedDate ?? b.deadline!,
               ),
-            for (final day in populated)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _fullDate(day),
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    for (final task in widget.controller.forDay(day))
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(task.title),
-                        subtitle: Text(
-                          widget.controller.completed(task, day)
-                              ? '已做过'
-                              : task.timeMinutes == null
-                              ? '未指定时刻'
-                              : _time(task.timeMinutes!),
-                        ),
-                        onTap: () => _showTaskDetails(
-                          context,
-                          widget.controller,
-                          task,
-                          day,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            if (selected == null && earlier.isNotEmpty)
-              ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                title: const Text('以前注明的日期'),
-                subtitle: const Text('保留原处，不自动延到今天'),
-                children: [
-                  for (final task in earlier)
-                    ListTile(
-                      title: Text(task.title),
-                      subtitle: Text(_fullDate(task.plannedDate!)),
-                      onTap: () => _showTaskDetails(
-                        context,
-                        widget.controller,
-                        task,
-                        today,
-                      ),
-                    ),
-                ],
-              ),
+            );
+      return Scaffold(
+        appBar: AppBar(title: const Text('有日期的事')),
+        body: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            const Text('日期是一条信息，不改变事项的状态。'),
+            const SizedBox(height: 20),
+            if (tasks.isEmpty) const Text('还没有注明约定或截止日期的事项。'),
+            for (final task in tasks)
+              TaskLine(controller: controller, task: task),
           ],
         ),
       );
@@ -524,67 +396,73 @@ class _ProjectSpaceSheetState extends State<ProjectSpaceSheet> {
               ),
               if (project.reason.isNotEmpty) Text(project.reason),
               const SizedBox(height: 24),
-              if (project.lastProgress.isNotEmpty) ...[
-                Text('上次留下', style: Theme.of(context).textTheme.bodySmall),
-                const SizedBox(height: 8),
-                Text(project.lastProgress),
-                const SizedBox(height: 24),
+              TextButton.icon(
+                onPressed: () => showTaskEditor(
+                  context,
+                  widget.controller,
+                  projectId: project.id,
+                ),
+                icon: const AppIcon(AppGlyph.add),
+                label: const Text('添加项目事项'),
+              ),
+              for (final phase in [
+                TaskPhase.doing,
+                TaskPhase.pending,
+                TaskPhase.completed,
+              ]) ...[
+                Text(
+                  phase == TaskPhase.doing
+                      ? '在做'
+                      : phase == TaskPhase.pending
+                      ? '待办'
+                      : '已完成',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                for (final task in widget.controller.snapshot.tasks.where(
+                  (t) =>
+                      t.projectId == project.id &&
+                      t.status != TaskStatus.archived &&
+                      t.phase == phase,
+                ))
+                  TaskLine(controller: widget.controller, task: task),
+                const SizedBox(height: 16),
               ],
-              TextField(
-                controller: next,
-                minLines: 1,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: '下次可以从哪开始（可选）',
-                  hintText: '留一条线索，不需要承诺',
-                ),
-              ),
-              const SizedBox(height: 18),
-              TextField(
-                controller: progress,
-                minLines: 2,
-                maxLines: 6,
-                decoration: const InputDecoration(
-                  labelText: '留下一点进展',
-                  hintText: '试过什么、发现什么、卡在哪里…',
-                ),
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: busy ? null : save,
-                child: Text(busy ? '保存中…' : '留下这段记录'),
-              ),
-              const SizedBox(height: 28),
-              if (project.status == ProjectStatus.active)
-                TextButton.icon(
-                  onPressed: busy
-                      ? null
-                      : () => showTaskEditor(
-                          context,
-                          widget.controller,
-                          projectId: project.id,
-                        ),
-                  icon: const AppIcon(AppGlyph.add),
-                  label: const Text('记下相关想法'),
-                ),
-              for (final task in widget.controller.snapshot.tasks.where(
-                (t) =>
-                    t.projectId == project.id &&
-                    t.status != TaskStatus.archived,
-              ))
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(task.title),
-                  subtitle: task.plannedDate == null
-                      ? null
-                      : Text(_fullDate(task.plannedDate!)),
-                  onTap: () => _showTaskDetails(
-                    context,
-                    widget.controller,
-                    task,
-                    DateTime.now(),
+              ExpansionTile(
+                title: const Text('项目笔记（可选）'),
+                children: [
+                  if (project.lastProgress.isNotEmpty) ...[
+                    Text('上次留下', style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 8),
+                    Text(project.lastProgress),
+                    const SizedBox(height: 24),
+                  ],
+                  TextField(
+                    controller: next,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: '下次可以从哪开始（可选）',
+                      hintText: '留一条线索，不需要承诺',
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 18),
+                  TextField(
+                    controller: progress,
+                    minLines: 2,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: '留下一点进展',
+                      hintText: '试过什么、发现什么、卡在哪里…',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: busy ? null : save,
+                    child: Text(busy ? '保存中…' : '留下这段记录'),
+                  ),
+                  const SizedBox(height: 28),
+                ],
+              ),
               if (project.progress.isNotEmpty)
                 ExpansionTile(
                   tilePadding: EdgeInsets.zero,

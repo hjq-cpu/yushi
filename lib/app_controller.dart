@@ -40,7 +40,9 @@ class AppController extends ChangeNotifier {
   List<TaskItem> forDay(DateTime day) => tasksForDay(snapshot, day);
   TaskItem? focusForDay(DateTime day) => focusTaskForDay(snapshot, day);
   bool completed(TaskItem task, DateTime day) =>
-      isTaskCompleted(snapshot, task, day);
+      (snapshot.tasks.where((t) => t.id == task.id).firstOrNull ?? task)
+          .phase ==
+      TaskPhase.completed;
 
   Future<void> addInbox(String title) async {
     final now = DateTime.now();
@@ -56,6 +58,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> addTask({
     required String title,
+    TaskItem? existing,
     DateTime? plannedDate,
     String note = '',
     String? projectId,
@@ -80,53 +83,105 @@ class AppController extends ChangeNotifier {
           .toList();
     }
     final item = TaskItem(
-      id: _id('task'),
+      id: existing?.id ?? _id('task'),
       title: title.trim(),
       note: note.trim(),
       projectId: projectId,
-      status: plannedDate == null ? TaskStatus.inbox : TaskStatus.planned,
+      status: existing?.status ?? TaskStatus.inbox,
+      phase: existing?.phase ?? TaskPhase.pending,
       plannedDate: plannedDate == null ? null : dateOnly(plannedDate),
       deadline: deadline == null ? null : dateOnly(deadline),
       timeMinutes: plannedDate == null ? null : timeMinutes,
       estimateMins: estimateMins,
       isFocus: plannedDate != null && isFocus,
       isPrivate: isPrivate,
-      recurrence: plannedDate == null ? const RecurrenceRule() : recurrence,
-      createdAt: now,
+      recurrence:
+          existing?.recurrence ??
+          (plannedDate == null ? const RecurrenceRule() : recurrence),
+      createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     );
-    await _commit(snapshot.copyWith(tasks: [...tasks, item]));
+    await _commit(
+      snapshot.copyWith(
+        tasks: existing == null
+            ? [...tasks, item]
+            : tasks.map((t) => t.id == item.id ? item : t).toList(),
+      ),
+    );
   }
 
   Future<void> toggleComplete(TaskItem task, DateTime day) async {
-    final id = '${task.id}@${dateKey(day)}';
-    final entries = [...snapshot.completions];
-    if (task.recurrence.type == RecurrenceType.none && completed(task, day)) {
-      entries.removeWhere(
-        (entry) =>
-            entry.taskId == task.id &&
-            entry.status == CompletionStatus.completed &&
-            !dateOnly(entry.date).isAfter(dateOnly(day)),
+    final current = snapshot.tasks.firstWhere((t) => t.id == task.id);
+    final done = current.phase == TaskPhase.completed;
+    final entries = snapshot.completions
+        .where(
+          (e) =>
+              e.taskId != task.id ||
+              (done
+                  ? e.status != CompletionStatus.completed
+                  : e.id != '${task.id}@${dateKey(day)}'),
+        )
+        .toList();
+    if (!done) {
+      entries.add(
+        CompletionEntry(
+          taskId: task.id,
+          date: dateOnly(day),
+          updatedAt: DateTime.now(),
+        ),
       );
-      await _commit(snapshot.copyWith(completions: entries));
-      return;
     }
-    final index = entries.indexWhere((entry) => entry.id == id);
-    if (index >= 0 && entries[index].status == CompletionStatus.completed) {
-      entries.removeAt(index);
-    } else {
-      final entry = CompletionEntry(
-        taskId: task.id,
-        date: dateOnly(day),
-        updatedAt: DateTime.now(),
-      );
-      if (index >= 0) {
-        entries[index] = entry;
-      } else {
-        entries.add(entry);
-      }
+    await _commit(
+      snapshot.copyWith(
+        tasks: snapshot.tasks
+            .map(
+              (t) => t.id == task.id
+                  ? t.copyWith(
+                      phase: done ? TaskPhase.pending : TaskPhase.completed,
+                      updatedAt: DateTime.now(),
+                    )
+                  : t,
+            )
+            .toList(),
+        completions: entries,
+      ),
+    );
+  }
+
+  List<TaskItem> get openTasks =>
+      snapshot.tasks
+          .where(
+            (t) =>
+                t.status != TaskStatus.archived &&
+                t.phase != TaskPhase.completed &&
+                !snapshot.projects.any(
+                  (p) =>
+                      p.id == t.projectId && p.status == ProjectStatus.archived,
+                ),
+          )
+          .toList()
+        ..sort((a, b) {
+          final phase = (a.phase == TaskPhase.doing ? 0 : 1).compareTo(
+            b.phase == TaskPhase.doing ? 0 : 1,
+          );
+          return phase != 0 ? phase : a.createdAt.compareTo(b.createdAt);
+        });
+
+  Future<void> setPhase(TaskItem task, TaskPhase phase) async {
+    if (phase == TaskPhase.completed || task.phase == TaskPhase.completed) {
+      throw ArgumentError('Use toggleComplete for completion changes');
     }
-    await _commit(snapshot.copyWith(completions: entries));
+    await _commit(
+      snapshot.copyWith(
+        tasks: snapshot.tasks
+            .map(
+              (t) => t.id == task.id
+                  ? t.copyWith(phase: phase, updatedAt: DateTime.now())
+                  : t,
+            )
+            .toList(),
+      ),
+    );
   }
 
   Future<void> postpone(TaskItem task, DateTime day) async {
@@ -136,7 +191,7 @@ class AppController extends ChangeNotifier {
               ? item.copyWith(
                   plannedDate: dateOnly(day),
                   isFocus: false,
-                  status: TaskStatus.planned,
+
                   updatedAt: DateTime.now(),
                 )
               : item,

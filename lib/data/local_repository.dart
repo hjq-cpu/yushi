@@ -105,7 +105,7 @@ class LocalRepository {
     final file = File(p.join(directory.path, 'yushi-$stamp.json'));
     final payload = {
       'format': 'yushi.backup',
-      'version': 1,
+      'version': 2,
       'exportedAt': now.toIso8601String(),
       'data': (await load()).toJson(),
     };
@@ -203,7 +203,8 @@ class LocalRepository {
   _DecodedBackup _decodeBackup(String source) {
     try {
       final root = _asObject(jsonDecode(source));
-      if (root['format'] != 'yushi.backup' || root['version'] != 1) {
+      if (root['format'] != 'yushi.backup' ||
+          ![1, 2].contains(root['version'])) {
         throw const FormatException('这不是受支持的余时备份文件。');
       }
       final exportedAt = DateTime.tryParse(root['exportedAt'] as String? ?? '');

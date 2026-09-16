@@ -14,7 +14,6 @@ import '../app_controller.dart';
 import '../data/local_repository.dart';
 import '../data/android_widget.dart';
 import '../domain/models.dart';
-import '../domain/planning.dart';
 import 'app_icons.dart';
 import 'theme.dart';
 
@@ -70,7 +69,6 @@ class _HomeShellState extends State<HomeShell> {
       final pages = [
         NowScreen(controller: widget.controller),
         ProjectsScreen(controller: widget.controller),
-        FootprintsScreen(controller: widget.controller),
       ];
       return Scaffold(
         appBar: AppBar(
@@ -105,6 +103,17 @@ class _HomeShellState extends State<HomeShell> {
           ),
           actions: [
             IconButton(
+              tooltip: '分享待办',
+              icon: const Icon(Icons.ios_share),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      SharePlanScreen(controller: widget.controller),
+                ),
+              ),
+            ),
+
+            IconButton(
               tooltip: '有日期的事',
               icon: const AppIcon(AppGlyph.calendar),
               onPressed: () => _openDates(context, widget.controller),
@@ -137,12 +146,14 @@ class _HomeShellState extends State<HomeShell> {
           indicatorColor: YushiColors.focus,
           onDestinationSelected: (value) => setState(() => index = value),
           destinations: const [
-            NavigationDestination(icon: AppIcon(AppGlyph.today), label: '此刻'),
+            NavigationDestination(
+              icon: Icon(Icons.checklist_rounded),
+              label: '待办',
+            ),
             NavigationDestination(
               icon: AppIcon(AppGlyph.projects),
-              label: '在意',
+              label: '项目',
             ),
-            NavigationDestination(icon: AppIcon(AppGlyph.book), label: '足迹'),
           ],
         ),
       );
@@ -207,7 +218,7 @@ class _IntroductionDialogState extends State<_IntroductionDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('这里可以装下想法、在意的方向和发生过的点滴。记下来，就已经有了一个可以回来的地方。'),
+          const Text('记下待办，想开始时移到在做，完成后留一份记录。事情不必按天清空，日期只在你需要时添加。'),
           const SizedBox(height: 18),
           const Text('随手记下', style: TextStyle(fontWeight: FontWeight.w700)),
           const Text('想到就记下，不必同时承诺日期、时长或完成标准。'),
@@ -256,7 +267,7 @@ class _IntroductionDialogState extends State<_IntroductionDialog> {
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
               ),
-              child: Text(saving ? '保存中…' : '开始今天'),
+              child: Text(saving ? '保存中…' : '开始使用'),
             ),
           ],
         ),
@@ -558,13 +569,13 @@ class _SharePlanScreenState extends State<SharePlanScreen> {
   bool busy = false;
 
   List<TaskItem> get tasks {
-    final all = widget.controller.forDay(dateOnly(DateTime.now()));
+    final all = widget.controller.openTasks;
     return all.where((task) => includePrivate || !task.isPrivate).toList();
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('分享今天的安排')),
+    appBar: AppBar(title: const Text('分享我的待办')),
     body: ListView(
       padding: const EdgeInsets.all(22),
       children: [
@@ -638,9 +649,9 @@ class _SharePlanScreenState extends State<SharePlanScreen> {
       final bytes = await capture();
       await Gal.putImageBytes(
         bytes,
-        name: '余时-今天的安排-${dateKey(DateTime.now())}',
+        name: '余时-我的待办-${dateKey(DateTime.now())}',
       );
-      if (mounted) _snack(context, '今天的安排已保存到相册');
+      if (mounted) _snack(context, '我的待办已保存到相册');
     } catch (e) {
       if (mounted) _snack(context, '保存失败：$e');
     } finally {
@@ -654,11 +665,11 @@ class _SharePlanScreenState extends State<SharePlanScreen> {
       final bytes = await capture();
       final directory = await getTemporaryDirectory();
       final file = File(
-        p.join(directory.path, '余时-今天的安排-${dateKey(DateTime.now())}.png'),
+        p.join(directory.path, '余时-我的待办-${dateKey(DateTime.now())}.png'),
       );
       await file.writeAsBytes(bytes, flush: true);
       await SharePlus.instance.share(
-        ShareParams(title: '余时 · 今天的安排', files: [XFile(file.path)]),
+        ShareParams(title: '余时 · 我的待办', files: [XFile(file.path)]),
       );
     } catch (e) {
       if (mounted) _snack(context, '分享面板打开失败：$e');
@@ -691,7 +702,7 @@ class PlanPoster extends StatelessWidget {
         Row(
           children: [
             Text(
-              'TODAY / 今日',
+              'TO DO / 待办',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontSize: 13,
                 color: YushiColors.cobalt,
@@ -701,7 +712,7 @@ class PlanPoster extends StatelessWidget {
             ),
             const Spacer(),
             Text(
-              '${tasks.length.toString().padLeft(2, '0')} 件安排',
+              '${tasks.length.toString().padLeft(2, '0')} 件事项',
               style: const TextStyle(
                 fontFamily: null,
                 fontSize: 10,
@@ -712,17 +723,14 @@ class PlanPoster extends StatelessWidget {
           ],
         ),
         const Divider(height: 28, color: YushiColors.ink),
-        Text('今天的安排', style: Theme.of(context).textTheme.headlineMedium),
+        Text('我的待办', style: Theme.of(context).textTheme.headlineMedium),
         Text(
           _fullDate(DateTime.now()),
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 28),
         if (tasks.isEmpty) ...[
-          Text(
-            '今天没有注明日期的安排。',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
+          Text('暂时没有待办事项。', style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 8),
           Text('给自己一点从容的空间。', style: Theme.of(context).textTheme.bodyMedium),
         ] else
@@ -765,7 +773,10 @@ class PlanPoster extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          _projectName(controller.snapshot, tasks[i]),
+                          _phaseName(tasks[i]) +
+                              (includeTimes
+                                  ? ' · ${_taskMetadata(controller.snapshot, tasks[i])}'
+                                  : ' · ${_projectName(controller.snapshot, tasks[i])}'),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         if (includeTimes)
@@ -777,7 +788,7 @@ class PlanPoster extends StatelessWidget {
                                 '约 ${tasks[i].estimateMins} 分钟',
                               controller.completed(tasks[i], DateTime.now())
                                   ? '已完成'
-                                  : '已安排',
+                                  : _phaseName(tasks[i]),
                             ].join(' · '),
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
@@ -864,7 +875,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const AppIcon(AppGlyph.today, color: YushiColors.cobalt),
-            title: const Text('添加今日待办小组件'),
+            title: const Text('添加待办小组件'),
             subtitle: const Text('在桌面查看待办；事项标题会显示在桌面上'),
             onTap: () async {
               try {
@@ -1034,6 +1045,7 @@ Future<void> showTaskEditor(
   DateTime? initialDate,
   String? projectId,
   bool focus = false,
+  TaskItem? existing,
 }) async {
   await showModalBottomSheet<void>(
     context: context,
@@ -1044,6 +1056,7 @@ Future<void> showTaskEditor(
       initialDate: initialDate,
       initialFocus: focus,
       initialProjectId: projectId,
+      existing: existing,
     ),
   );
 }
@@ -1055,11 +1068,13 @@ class TaskEditorSheet extends StatefulWidget {
     required this.initialDate,
     required this.initialFocus,
     this.initialProjectId,
+    this.existing,
   });
   final AppController controller;
   final DateTime? initialDate;
   final bool initialFocus;
   final String? initialProjectId;
+  final TaskItem? existing;
   @override
   State<TaskEditorSheet> createState() => _TaskEditorSheetState();
 }
@@ -1068,6 +1083,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
   final title = TextEditingController();
   final note = TextEditingController();
   DateTime? day;
+  DateTime? deadline;
   late bool focus;
   bool private = false;
   bool busy = false;
@@ -1081,6 +1097,17 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     day = widget.initialDate == null ? null : dateOnly(widget.initialDate!);
     focus = widget.initialFocus;
     projectId = widget.initialProjectId;
+    final task = widget.existing;
+    if (task != null) {
+      title.text = task.title;
+      note.text = task.note;
+      day = task.plannedDate;
+      deadline = task.deadline;
+      projectId = task.projectId;
+      private = task.isPrivate;
+      timeMinutes = task.timeMinutes;
+      estimate = task.estimateMins;
+    }
   }
 
   @override
@@ -1117,14 +1144,14 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
             children: [
               Expanded(
                 child: Text(
-                  day == null ? '记下一件事' : '安排一件具体的事',
+                  '记下一件事',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
               const SizedBox(width: 12),
               FilledButton(
                 onPressed: busy ? null : save,
-                child: Text(busy ? '保存中…' : (day == null ? '记下' : '加入计划')),
+                child: Text(busy ? '保存中…' : '记下'),
               ),
             ],
           ),
@@ -1148,7 +1175,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const AppIcon(AppGlyph.calendar),
-                  title: const Text('日期（可选）'),
+                  title: const Text('约定日期（可选）'),
                   subtitle: Text(day == null ? '暂不安排' : _monthDay(day!)),
                   onTap: pickDate,
                 ),
@@ -1176,6 +1203,26 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
               }),
               child: const Text('取消日期，先记着'),
             ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('截止日期（可选）'),
+            subtitle: Text(deadline == null ? '没有截止日期' : _fullDate(deadline!)),
+            trailing: deadline == null
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => setState(() => deadline = null),
+                  ),
+            onTap: () async {
+              final value = await showDatePicker(
+                context: context,
+                initialDate: deadline ?? DateTime.now(),
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+              );
+              if (value != null && mounted) setState(() => deadline = value);
+            },
+          ),
           ExpansionTile(
             title: const Text('更多选项'),
             tilePadding: EdgeInsets.zero,
@@ -1204,7 +1251,9 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                   ),
                   ...widget.controller.snapshot.projects
                       .where(
-                        (project) => project.status == ProjectStatus.active,
+                        (project) =>
+                            project.status == ProjectStatus.active ||
+                            project.id == projectId,
                       )
                       .map(
                         (project) => DropdownMenuItem<String?>(
@@ -1216,31 +1265,6 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
                 onChanged: (value) => setState(() => projectId = value),
               ),
               const SizedBox(height: 12),
-              if (day != null)
-                DropdownButtonFormField<RecurrenceType>(
-                  initialValue: recurrence,
-                  decoration: const InputDecoration(labelText: '重复'),
-                  items: const [
-                    DropdownMenuItem(
-                      value: RecurrenceType.none,
-                      child: Text('不重复'),
-                    ),
-                    DropdownMenuItem(
-                      value: RecurrenceType.daily,
-                      child: Text('每天'),
-                    ),
-                    DropdownMenuItem(
-                      value: RecurrenceType.weekdays,
-                      child: Text('工作日'),
-                    ),
-                    DropdownMenuItem(
-                      value: RecurrenceType.weeklyTarget,
-                      child: Text('每周一次'),
-                    ),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => recurrence = value ?? RecurrenceType.none),
-                ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('私密事项'),
@@ -1286,9 +1310,11 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
     setState(() => busy = true);
     try {
       await widget.controller.addTask(
+        existing: widget.existing,
         title: title.text,
         note: note.text,
         plannedDate: day,
+        deadline: deadline,
         projectId: projectId,
         timeMinutes: timeMinutes,
         estimateMins: estimate,
@@ -1297,7 +1323,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
         recurrence: RecurrenceRule(type: recurrence, weeklyTarget: 1),
       );
       if (mounted) {
-        _snack(context, day == null ? '已记下' : '已加入 ${_monthDay(day!)}的计划');
+        _snack(context, '已保存');
         Navigator.pop(context);
       }
     } catch (e) {
@@ -1370,9 +1396,7 @@ Future<void> _showTaskDetails(
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        completed
-                            ? '已完成'
-                            : (task.plannedDate == null ? '已记下' : '已安排'),
+                        completed ? '已完成' : _phaseName(task),
                         style: TextStyle(
                           color: completed
                               ? YushiColors.success
@@ -1447,6 +1471,19 @@ Future<void> _showTaskDetails(
                       style: const TextStyle(color: YushiColors.danger),
                     ),
                   ),
+                TextButton(
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          Navigator.pop(sheetContext);
+                          await showTaskEditor(
+                            pageContext,
+                            controller,
+                            existing: task,
+                          );
+                        },
+                  child: const Text('编辑事项'),
+                ),
                 const SizedBox(height: 24),
                 TextButton(
                   onPressed: busy
@@ -1470,12 +1507,28 @@ Future<void> _showTaskDetails(
                         },
                   child: Text(task.plannedDate == null ? '选择日期' : '调整日期'),
                 ),
+                if (!completed)
+                  FilledButton(
+                    onPressed: busy
+                        ? null
+                        : () => perform(
+                            () => controller.setPhase(
+                              task,
+                              task.phase == TaskPhase.doing
+                                  ? TaskPhase.pending
+                                  : TaskPhase.doing,
+                            ),
+                          ),
+                    child: Text(
+                      task.phase == TaskPhase.doing ? '先放下，回到待办' : '开始做',
+                    ),
+                  ),
                 if (task.plannedDate != null)
                   TextButton(
                     onPressed: busy
                         ? null
                         : () => perform(() => controller.unschedule(task)),
-                    child: const Text('取消安排，保留想法'),
+                    child: const Text('移除约定日期'),
                   ),
                 SizedBox(
                   width: double.infinity,

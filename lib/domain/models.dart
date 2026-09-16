@@ -2,6 +2,8 @@ import 'dart:convert';
 
 const _notProvided = Object();
 
+enum TaskPhase { pending, doing, completed }
+
 enum TaskStatus { inbox, active, planned, someday, archived }
 
 enum ProjectStatus { active, paused, archived }
@@ -73,6 +75,7 @@ class TaskItem {
     this.note = '',
     this.projectId,
     this.status = TaskStatus.inbox,
+    this.phase = TaskPhase.pending,
     this.plannedDate,
     this.deadline,
     this.timeMinutes,
@@ -89,6 +92,7 @@ class TaskItem {
   final String note;
   final String? projectId;
   final TaskStatus status;
+  final TaskPhase phase;
   final DateTime? plannedDate;
   final DateTime? deadline;
   final int? timeMinutes;
@@ -105,6 +109,7 @@ class TaskItem {
     String? note,
     Object? projectId = _notProvided,
     TaskStatus? status,
+    TaskPhase? phase,
     Object? plannedDate = _notProvided,
     Object? deadline = _notProvided,
     Object? timeMinutes = _notProvided,
@@ -122,6 +127,7 @@ class TaskItem {
         ? this.projectId
         : projectId as String?,
     status: status ?? this.status,
+    phase: phase ?? this.phase,
     plannedDate: identical(plannedDate, _notProvided)
         ? this.plannedDate
         : plannedDate as DateTime?,
@@ -145,6 +151,7 @@ class TaskItem {
     'note': note,
     'projectId': projectId,
     'status': status.name,
+    'phase': phase.name,
     'plannedDate': plannedDate == null ? null : dateKey(plannedDate!),
     'deadline': deadline == null ? null : dateKey(deadline!),
     'timeMinutes': timeMinutes,
@@ -162,6 +169,9 @@ class TaskItem {
     note: _string(json, 'note'),
     projectId: _nullableString(json, 'projectId'),
     status: _enumValue(json, 'status', TaskStatus.values),
+    phase: json.containsKey('phase')
+        ? _enumValue(json, 'phase', TaskPhase.values)
+        : TaskPhase.pending,
     plannedDate: _nullableDate(json, 'plannedDate'),
     deadline: _nullableDate(json, 'deadline'),
     timeMinutes: json['timeMinutes'] == null
@@ -418,6 +428,20 @@ class AppSnapshot {
       json,
       'completions',
     ).map((item) => CompletionEntry.fromJson(_object(item))).toList();
+    // Legacy one-off completions become persistent state. Repeating tasks stay
+    // pending; their historical records are retained without generating copies.
+    final rawTasks = _list(json, 'tasks');
+    for (var i = 0; i < tasks.length; i++) {
+      if (!_object(rawTasks[i]).containsKey('phase') &&
+          tasks[i].recurrence.type == RecurrenceType.none &&
+          completions.any(
+            (e) =>
+                e.taskId == tasks[i].id &&
+                e.status == CompletionStatus.completed,
+          )) {
+        tasks[i] = tasks[i].copyWith(phase: TaskPhase.completed);
+      }
+    }
     final taskIds = tasks.map((task) => task.id).toSet();
     final projectIds = projects.map((project) => project.id).toSet();
     if (taskIds.length != tasks.length ||
