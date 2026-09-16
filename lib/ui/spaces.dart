@@ -21,7 +21,9 @@ class TaskLine extends StatelessWidget {
   final TaskItem task;
   @override
   Widget build(BuildContext context) => ListTile(
-    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+    contentPadding: EdgeInsets.zero,
+    minVerticalPadding: 4,
+    visualDensity: const VisualDensity(vertical: -2),
     leading: IconButton(
       tooltip: task.phase == TaskPhase.completed ? '撤销完成' : '完成事项',
       icon: Icon(

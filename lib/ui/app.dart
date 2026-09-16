@@ -1226,6 +1226,7 @@ class _TaskEditorSheetState extends State<TaskEditorSheet> {
           ExpansionTile(
             title: const Text('更多选项'),
             tilePadding: EdgeInsets.zero,
+            childrenPadding: const EdgeInsets.only(top: 14, bottom: 8),
             children: [
               DropdownButtonFormField<int>(
                 initialValue: estimate,
@@ -1484,7 +1485,7 @@ Future<void> _showTaskDetails(
                         },
                   child: const Text('编辑事项'),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 4),
                 TextButton(
                   onPressed: busy
                       ? null
@@ -1507,22 +1508,6 @@ Future<void> _showTaskDetails(
                         },
                   child: Text(task.plannedDate == null ? '选择日期' : '调整日期'),
                 ),
-                if (!completed)
-                  FilledButton(
-                    onPressed: busy
-                        ? null
-                        : () => perform(
-                            () => controller.setPhase(
-                              task,
-                              task.phase == TaskPhase.doing
-                                  ? TaskPhase.pending
-                                  : TaskPhase.doing,
-                            ),
-                          ),
-                    child: Text(
-                      task.phase == TaskPhase.doing ? '先放下，回到待办' : '开始做',
-                    ),
-                  ),
                 if (task.plannedDate != null)
                   TextButton(
                     onPressed: busy
@@ -1530,6 +1515,33 @@ Future<void> _showTaskDetails(
                         : () => perform(() => controller.unschedule(task)),
                     child: const Text('移除约定日期'),
                   ),
+                if (!completed) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: busy
+                          ? null
+                          : () => perform(
+                              () => controller.setPhase(
+                                task,
+                                task.phase == TaskPhase.doing
+                                    ? TaskPhase.pending
+                                    : TaskPhase.doing,
+                              ),
+                            ),
+                      child: Text(
+                        task.phase == TaskPhase.doing ? '先放下，回到待办' : '开始做',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
