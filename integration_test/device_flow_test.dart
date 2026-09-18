@@ -59,11 +59,12 @@ void main() {
     await tester.pumpWidget(YushiApp(controller: controller));
     await settle();
 
+    await tap(find.byTooltip('添加事项'));
     await tester.enterText(
-      find.widgetWithText(TextField, '想到什么，先记下来…'),
+      find.widgetWithText(TextField, '要做什么'),
       '测试事项：周末试试水彩',
     );
-    await tap(find.widgetWithText(TextButton, '记下'));
+    await tap(find.widgetWithText(FilledButton, '记下'));
     await waitFor(() => controller.snapshot.tasks.isNotEmpty);
     expect(controller.snapshot.tasks.single.phase, TaskPhase.pending);
     await tap(find.text('测试事项：周末试试水彩'));
@@ -75,7 +76,7 @@ void main() {
     expect(controller.snapshot.tasks.single.phase, TaskPhase.doing);
     await tap(find.byTooltip('完成事项'));
     await waitFor(() => controller.openTasks.isEmpty);
-    await tap(find.text('完成记录'));
+    await tap(find.byTooltip('完成记录'));
     await tap(find.byTooltip('撤销完成'));
     await waitFor(() => controller.openTasks.isNotEmpty);
     await tap(find.byTooltip('Back'));

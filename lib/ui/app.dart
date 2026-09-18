@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:gal/gal.dart';
@@ -40,6 +41,116 @@ class HomeShell extends StatefulWidget {
 
   @override
   State<HomeShell> createState() => _HomeShellState();
+}
+
+class PullUpToAdd extends StatefulWidget {
+  const PullUpToAdd({super.key, required this.child, required this.onAdd});
+  final Widget child;
+  final Future<void> Function() onAdd;
+
+  @override
+  State<PullUpToAdd> createState() => _PullUpToAddState();
+}
+
+class _PullUpToAddState extends State<PullUpToAdd> {
+  static const triggerDistance = 64.0;
+  double distance = 0;
+  bool armed = false;
+  bool opening = false;
+
+  void resetPull() {
+    if (distance == 0 && !armed) return;
+    setState(() {
+      distance = 0;
+      armed = false;
+    });
+  }
+
+  void onDragStart(DragStartDetails details) {
+    if (!opening) resetPull();
+  }
+
+  void onDragUpdate(DragUpdateDetails details) {
+    if (opening) return;
+    final next = (distance - details.delta.dy).clamp(0.0, double.infinity);
+    if (next != distance || (next >= triggerDistance) != armed) {
+      setState(() {
+        distance = next;
+        armed = next >= triggerDistance;
+      });
+    }
+  }
+
+  Future<void> _openAfterRelease() async {
+    if (opening || !armed) return;
+    setState(() {
+      opening = true;
+      distance = 0;
+      armed = false;
+    });
+    try {
+      await widget.onAdd();
+    } finally {
+      if (mounted) {
+        setState(() {
+          opening = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openFromTap() async {
+    if (opening) return;
+    setState(() {
+      opening = true;
+      distance = 0;
+      armed = false;
+    });
+    try {
+      await widget.onAdd();
+    } finally {
+      if (mounted) setState(() => opening = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    dragStartBehavior: DragStartBehavior.down,
+    onVerticalDragStart: onDragStart,
+    onVerticalDragUpdate: onDragUpdate,
+    onVerticalDragEnd: (_) {
+      if (armed) {
+        _openAfterRelease();
+      } else {
+        resetPull();
+      }
+    },
+    onVerticalDragCancel: resetPull,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 24,
+          child: Tooltip(
+            message: '添加事项',
+            child: InkWell(
+              onTap: _openFromTap,
+              child: Center(
+                child: Text(
+                  armed ? '松开添加' : '上拉添加',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.colors.secondary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        widget.child,
+      ],
+    ),
+  );
 }
 
 class _HomeShellState extends State<HomeShell> {
@@ -142,20 +253,24 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ),
         body: SafeArea(top: false, child: pages[index]),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: index,
-          indicatorColor: context.colors.focus,
-          onDestinationSelected: (value) => setState(() => index = value),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.checklist_rounded),
-              label: '待办',
-            ),
-            NavigationDestination(
-              icon: AppIcon(AppGlyph.projects),
-              label: '项目',
-            ),
-          ],
+        bottomNavigationBar: PullUpToAdd(
+          key: ValueKey(index),
+          onAdd: () => showTaskEditor(context, widget.controller),
+          child: NavigationBar(
+            selectedIndex: index,
+            indicatorColor: context.colors.focus,
+            onDestinationSelected: (value) => setState(() => index = value),
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.checklist_rounded),
+                label: '待办',
+              ),
+              NavigationDestination(
+                icon: AppIcon(AppGlyph.projects),
+                label: '项目',
+              ),
+            ],
+          ),
         ),
       );
     },

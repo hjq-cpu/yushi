@@ -63,100 +63,176 @@ class NowScreen extends StatefulWidget {
 class _NowScreenState extends State<NowScreen> {
   String query = '';
   String? projectId;
+  bool searchOpen = false;
+  final searchController = TextEditingController();
+  final searchFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  void openSearch() {
+    setState(() => searchOpen = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) searchFocusNode.requestFocus();
+    });
+  }
+
+  void closeSearch() {
+    searchController.clear();
+    searchFocusNode.unfocus();
+    setState(() {
+      query = '';
+      searchOpen = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
+    final projects = controller.snapshot.projects
+        .where((p) => p.status != ProjectStatus.archived)
+        .toList();
+    final selectedProjectId = projects.any((p) => p.id == projectId)
+        ? projectId
+        : null;
+    final selectedProjectTitle = selectedProjectId == null
+        ? null
+        : projects.firstWhere((p) => p.id == selectedProjectId).title;
     final tasks = controller.openTasks
         .where(
           (t) =>
-              (projectId == null || t.projectId == projectId) &&
+              (selectedProjectId == null || t.projectId == selectedProjectId) &&
               '${t.title} ${t.note}'.toLowerCase().contains(
                 query.toLowerCase(),
               ),
         )
         .toList();
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+    final allProjectsValue = '__all_projects__';
+    final doingTasks = tasks.where((t) => t.phase == TaskPhase.doing).toList();
+    final pendingTasks = tasks
+        .where((t) => t.phase == TaskPhase.pending)
+        .toList();
+
+    Widget phaseSection(
+      String title,
+      List<TaskItem> phaseTasks,
+      String empty,
+    ) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('一件一件，慢慢来。', style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 10),
-        const Text('事情留在这里，按自己的步调继续。'),
-        const SizedBox(height: 24),
-        QuickCapture(controller: controller),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            TextButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => CompletedScreen(controller: controller),
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            if (phaseTasks.isEmpty) ...[
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  query.isNotEmpty || selectedProjectId != null
+                      ? '没有匹配的事项'
+                      : empty,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              child: const Text('完成记录'),
-            ),
-            TextButton(
-              onPressed: () => showTaskEditor(context, controller),
-              child: const Text('添加详细事项'),
-            ),
+            ],
           ],
         ),
-        TextField(
-          decoration: const InputDecoration(
-            hintText: '搜索事项',
-            prefixIcon: Icon(Icons.search),
-          ),
-          onChanged: (value) => setState(() => query = value),
-        ),
-        const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              ChoiceChip(
-                label: const Text('全部项目'),
-                selected: projectId == null,
-                onSelected: (_) => setState(() => projectId = null),
-              ),
-              for (final project in controller.snapshot.projects.where(
-                (p) => p.status != ProjectStatus.archived,
-              ))
-                Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: ChoiceChip(
-                    label: Text(project.title),
-                    selected: projectId == project.id,
-                    onSelected: (_) => setState(() => projectId = project.id),
+        for (final task in phaseTasks)
+          TaskLine(controller: controller, task: task),
+      ],
+    );
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+      children: [
+        Row(
+          children: [
+            if (searchOpen)
+              Expanded(
+                child: TextField(
+                  controller: searchController,
+                  focusNode: searchFocusNode,
+                  autofocus: true,
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: '搜索事项',
+                    prefixIcon: const Icon(Icons.search),
+                    isDense: true,
+                    helperText: selectedProjectTitle == null
+                        ? null
+                        : '项目：${selectedProjectTitle.length > 20 ? '${selectedProjectTitle.substring(0, 20)}…' : selectedProjectTitle}',
+                    helperMaxLines: 1,
+                  ),
+                  onChanged: (value) => setState(() => query = value),
+                ),
+              )
+            else
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: selectedProjectId ?? allProjectsValue,
+                    hint: const Text('全部项目'),
+                    items: [
+                      DropdownMenuItem<String>(
+                        value: allProjectsValue,
+                        child: Text('全部项目'),
+                      ),
+                      for (final project in projects)
+                        DropdownMenuItem<String>(
+                          value: project.id,
+                          child: Text(
+                            project.title,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) => setState(
+                      () =>
+                          projectId = value == allProjectsValue ? null : value,
+                    ),
                   ),
                 ),
-            ],
-          ),
-        ),
-        for (final phase in [TaskPhase.doing, TaskPhase.pending]) ...[
-          const SizedBox(height: 28),
-          Text(
-            phase == TaskPhase.doing ? '在做' : '待办',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          if (!tasks.any((t) => t.phase == phase))
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                query.isNotEmpty || projectId != null
-                    ? '没有匹配的事项'
-                    : phase == TaskPhase.doing
-                    ? '想开始时，从待办里选一件。'
-                    : '想到什么，随手记下。',
               ),
-            ),
-          for (final task in tasks.where((t) => t.phase == phase))
-            TaskLine(controller: controller, task: task),
-        ],
-        if (controller.error != null)
+            if (searchOpen)
+              IconButton(
+                tooltip: '关闭搜索',
+                icon: const Icon(Icons.close),
+                onPressed: closeSearch,
+              )
+            else ...[
+              IconButton(
+                tooltip: '搜索事项',
+                icon: const Icon(Icons.search),
+                onPressed: openSearch,
+              ),
+              IconButton(
+                tooltip: '完成记录',
+                icon: const Icon(Icons.history),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CompletedScreen(controller: controller),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 12),
+        phaseSection('在做', doingTasks, '暂无进行中的事项'),
+        const SizedBox(height: 16),
+        phaseSection('待办', pendingTasks, '想到什么，随手记下'),
+        if (controller.error != null) ...[
+          const SizedBox(height: 12),
           Text(
             controller.error!,
             style: TextStyle(color: context.colors.danger),
           ),
+        ],
       ],
     );
   }

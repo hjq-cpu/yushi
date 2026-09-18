@@ -26,12 +26,12 @@ void main() {
     await tester.pumpWidget(YushiApp(controller: c));
     await tester.pumpAndSettle();
     expect(
-      Theme.of(tester.element(find.text('一件一件，慢慢来。'))).brightness,
+      Theme.of(tester.element(find.byTooltip('搜索事项'))).brightness,
       Brightness.light,
     );
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
     await tester.pumpAndSettle();
-    final dark = Theme.of(tester.element(find.text('一件一件，慢慢来。')));
+    final dark = Theme.of(tester.element(find.byTooltip('搜索事项')));
     expect(dark.brightness, Brightness.dark);
     expect(dark.scaffoldBackgroundColor.computeLuminance(), lessThan(0.05));
     expect(

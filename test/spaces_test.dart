@@ -16,6 +16,10 @@ void main() {
       databasePath: inMemoryDatabasePath,
     );
     final controller = AppController(repository);
+    addTearDown(() async {
+      await repository.close();
+      controller.dispose();
+    });
     await tester.runAsync(() async {
       await controller.initialize();
       await controller.addProject('绘画', '喜欢颜色');
@@ -25,7 +29,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('节奏'), findsNothing);
     expect(find.text('今天的安排'), findsNothing);
-    expect(find.text('一件一件，慢慢来。'), findsOneWidget);
+    expect(find.text('一件一件，慢慢来。'), findsNothing);
+    expect(find.text('事情留在这里，按自己的步调继续。'), findsNothing);
+    expect(find.byType(QuickCapture), findsNothing);
+    expect(find.byTooltip('搜索事项'), findsOneWidget);
+    expect(find.byTooltip('完成记录'), findsOneWidget);
+    expect(find.text('全部项目'), findsOneWidget);
+    expect(find.text('添加详细事项'), findsNothing);
     await tester.runAsync(() async {
       await controller.addTask(
         title: '画一张速写',
@@ -38,10 +48,32 @@ void main() {
     });
     await tester.pumpAndSettle();
     expect(find.text('画一张速写'), findsOneWidget);
+    await tester.tap(
+      find.byWidgetPredicate((widget) => widget is DropdownButton),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('绘画').hitTestable().last);
+    await tester.pumpAndSettle();
+    expect(find.text('画一张速写'), findsOneWidget);
+    await tester.tap(
+      find.byWidgetPredicate((widget) => widget is DropdownButton),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部项目').hitTestable().last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('搜索事项'));
+    await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextField, '搜索事项'), '不存在');
     await tester.pumpAndSettle();
     expect(find.text('画一张速写'), findsNothing);
+    await tester.tap(find.byTooltip('关闭搜索'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, '搜索事项'), findsNothing);
+    await tester.tap(find.byTooltip('搜索事项'));
+    await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextField, '搜索事项'), '');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('关闭搜索'));
     await tester.pumpAndSettle();
     await tester.runAsync(() async {
       await controller.toggleComplete(
@@ -51,13 +83,11 @@ void main() {
     });
     await tester.pumpAndSettle();
     expect(find.text('画一张速写'), findsNothing);
-    await tester.tap(find.text('完成记录'));
+    await tester.tap(find.byTooltip('完成记录'));
     await tester.pumpAndSettle();
     expect(find.text('画一张速写'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.runAsync(repository.close);
-    controller.dispose();
   });
 
   testWidgets('日期作为独立入口，只展示有安排的日子，并能取消安排', (tester) async {
@@ -67,6 +97,10 @@ void main() {
       databasePath: inMemoryDatabasePath,
     );
     final controller = AppController(repository);
+    addTearDown(() async {
+      await repository.close();
+      controller.dispose();
+    });
     await tester.runAsync(() async {
       await controller.initialize();
       await controller.dismissIntroductionPermanently();
@@ -98,7 +132,5 @@ void main() {
     expect(find.text('还没有注明约定或截止日期的事项。'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.runAsync(repository.close);
-    controller.dispose();
   });
 }

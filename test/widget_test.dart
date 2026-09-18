@@ -102,7 +102,7 @@ void main() {
     rendered.dispose();
     expect(tester.takeException(), isNull);
   });
-  testWidgets('首页呈现待办与快速记录', (tester) async {
+  testWidgets('首页呈现待办与添加入口', (tester) async {
     sqfliteFfiInit();
     final repository = LocalRepository(
       databaseFactory: databaseFactoryFfi,
@@ -114,9 +114,118 @@ void main() {
     await tester.pumpWidget(_appWithoutIntroduction(controller));
     await tester.pump();
 
-    expect(find.text('一件一件，慢慢来。'), findsOneWidget);
-    expect(find.widgetWithText(TextField, '想到什么，先记下来…'), findsOneWidget);
+    expect(find.text('一件一件，慢慢来。'), findsNothing);
+    expect(find.byType(QuickCapture), findsNothing);
+    expect(find.byTooltip('搜索事项'), findsOneWidget);
+    expect(find.byTooltip('添加事项'), findsOneWidget);
+    expect(find.byTooltip('添加事项'), findsOneWidget);
+    expect(find.byType(FloatingActionButton), findsNothing);
+    expect(find.text('添加详细事项'), findsNothing);
     expect(find.text('待办'), findsWidgets);
+  });
+
+  testWidgets('窄屏首页保持首条待办可见，搜索可收起并能添加事项', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    sqfliteFfiInit();
+    final repository = LocalRepository(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: inMemoryDatabasePath,
+    );
+    final controller = AppController(repository)..loading = false;
+    addTearDown(() async {
+      await repository.close();
+      controller.dispose();
+    });
+    await tester.runAsync(() async {
+      for (var i = 1; i <= 5; i++) {
+        await controller.addTask(title: '窄屏待办 $i');
+      }
+    });
+    await tester.pumpWidget(_appWithoutIntroduction(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('搜索事项'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '搜索事项'), findsNothing);
+    final first = find.text('窄屏待办 1');
+    expect(first, findsOneWidget);
+    expect(tester.getTopLeft(first).dy, lessThan(400));
+    expect(find.byTooltip('添加事项'), findsOneWidget);
+    expect(find.byType(FloatingActionButton), findsNothing);
+    expect(find.text('在做'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('搜索事项'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, '搜索事项'), '窄屏待办 5');
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TaskLine, '窄屏待办 5'), findsOneWidget);
+    expect(find.widgetWithText(TaskLine, '窄屏待办 1'), findsNothing);
+    await tester.tap(find.byTooltip('关闭搜索'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, '搜索事项'), findsNothing);
+    expect(find.text('窄屏待办 1'), findsOneWidget);
+
+    await tester.tap(find.text('项目'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProjectsScreen), findsOneWidget);
+    await tester.tap(find.byTooltip('添加事项'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, '要做什么'), '窄屏新增事项');
+    await tester.tap(find.widgetWithText(FilledButton, '记下'));
+    await tester.pump();
+    await tester.runAsync(() async {
+      for (
+        var i = 0;
+        i < 100 && !controller.snapshot.tasks.any((t) => t.title == '窄屏新增事项');
+        i++
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    });
+    await tester.pumpAndSettle();
+    expect(
+      controller.snapshot.tasks.any((task) => task.title == '窄屏新增事项'),
+      isTrue,
+    );
+    expect(find.byType(ProjectsScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('底部导航上拉释放打开添加事项，内容列表滚动不打开', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    sqfliteFfiInit();
+
+    final repository = LocalRepository(
+      databaseFactory: databaseFactoryFfi,
+      databasePath: inMemoryDatabasePath,
+    );
+    final controller = AppController(repository)..loading = false;
+    addTearDown(() async {
+      await repository.close();
+      controller.dispose();
+    });
+    await tester.pumpWidget(_appWithoutIntroduction(controller));
+    await tester.pumpAndSettle();
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(NavigationBar)),
+    );
+    await gesture.moveBy(const Offset(0, -140));
+    await tester.pump();
+    expect(find.byType(TaskEditorSheet), findsNothing);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.byType(TaskEditorSheet), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+
+    await tester.pumpWidget(_appWithoutIntroduction(controller));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).first, const Offset(0, -180));
+    await tester.pumpAndSettle();
+    expect(find.byType(TaskEditorSheet), findsNothing);
   });
 
   testWidgets('创建项目后安全关闭弹窗并显示项目', (tester) async {
